@@ -5,9 +5,6 @@
 
 #include "util_macros.h"
 
-// #include "nrf_uicr.h"
-// #include "nrf_flash.h"
-
 #include "dfu_upgrade_payload.h"
 
 #include "nrf_log.h"

@@ -56,7 +56,6 @@
 #include "app_error_weak.h"
 #include "nrf_bootloader.h"
 #include "nrf_bootloader_app_start.h"
-// #include "nrf_bootloader_dfu_timers.h"
 #include "nrf_bootloader_info.h"
 #include "nrf_mbr.h"
 #include "nrf_gpio.h"

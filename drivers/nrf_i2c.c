@@ -93,6 +93,25 @@ static void nrf_i2c_bus_clear()
     TWI_PIN_CFG_STD(twi_config.sda);
 }
 
+// Note: This is a workaround, only use when required
+static void nrf_i2c_strong_drive_ctrl(bool enable)
+{
+    PRINT_CURRENT_LOCATION();
+
+    if ( enable )
+    {
+        TWI_PIN_CFG_STRONG(twi_config.sda);
+        TWI_PIN_CFG_STRONG(twi_config.scl);
+        // TWI_PIN_CFG_FORCE(twi_config.sda);
+        // TWI_PIN_CFG_FORCE(twi_config.scl);
+    }
+    else
+    {
+        TWI_PIN_CFG_STD(twi_config.sda);
+        TWI_PIN_CFG_STD(twi_config.scl);
+    }
+}
+
 static bool nrf_i2c_init()
 {
     PRINT_CURRENT_LOCATION();
@@ -240,25 +259,6 @@ static bool nrf_i2c_reg_clr_bits(const uint8_t device_addr, const uint8_t reg_ad
 // ================================
 // functions public
 
-// Note: This is a workaround, only use when required
-void nrf_i2c_strong_drive_ctrl(bool enable)
-{
-    PRINT_CURRENT_LOCATION();
-
-    if ( enable )
-    {
-        TWI_PIN_CFG_STRONG(twi_config.sda);
-        TWI_PIN_CFG_STRONG(twi_config.scl);
-        // TWI_PIN_CFG_FORCE(twi_config.sda);
-        // TWI_PIN_CFG_FORCE(twi_config.scl);
-    }
-    else
-    {
-        TWI_PIN_CFG_STD(twi_config.sda);
-        TWI_PIN_CFG_STD(twi_config.scl);
-    }
-}
-
 I2C_t* nrf_i2c_get_instance()
 {
     PRINT_CURRENT_LOCATION();
@@ -267,8 +267,9 @@ I2C_t* nrf_i2c_get_instance()
     i2c_handle.isInitialized = &i2c_configured;
     i2c_handle.Init = nrf_i2c_init;
     i2c_handle.Deinit = nrf_i2c_deinit;
-    i2c_handle.Send = nrf_i2c_send;
     i2c_handle.Reset = nrf_i2c_bus_clear;
+    i2c_handle.HighDriveStrengthCtrl = nrf_i2c_strong_drive_ctrl;
+    i2c_handle.Send = nrf_i2c_send;
     i2c_handle.Receive = nrf_i2c_receive;
     i2c_handle.Reg.Write = nrf_i2c_reg_write;
     i2c_handle.Reg.Read = nrf_i2c_reg_read;

@@ -1,9 +1,6 @@
 #include <memory.h>
 #include <stdarg.h>
 
-#include <SEGGER_RTT_Conf.h>
-#include <SEGGER_RTT.h>
-
 #include "power_manage.h"
 
 #include "nrf_i2c.h"
@@ -25,15 +22,6 @@ PMU_t* pmu_p = NULL;
 
 // ================================
 // functions private
-
-static bool pmu_if_reset()
-{
-    PRINT_CURRENT_LOCATION();
-
-    // no impl.
-
-    return true;
-}
 
 static void pmu_if_irq(const uint64_t irq)
 {
@@ -250,7 +238,8 @@ bool power_manage_init()
     pmu_if.isInitialized = i2c_handle->isInitialized;
     pmu_if.Init = i2c_handle->Init;
     pmu_if.Deinit = i2c_handle->Deinit;
-    pmu_if.Reset = pmu_if_reset;
+    pmu_if.Reset = i2c_handle->Reset;
+    pmu_if.HighDriveStrengthCtrl = i2c_handle->HighDriveStrengthCtrl;
     pmu_if.Send = i2c_handle->Send;
     pmu_if.Receive = i2c_handle->Receive;
     pmu_if.Irq = pmu_if_irq;

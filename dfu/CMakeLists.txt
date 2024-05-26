@@ -51,9 +51,6 @@ set(
   ${NRF_SDK_ROOT}/components/libraries/strerror
   ${NRF_SDK_ROOT}/components/libraries/svc
   ${NRF_SDK_ROOT}/components/libraries/util
-  # ${NRF_SDK_ROOT}/components/libraries/twi_mngr
-  # ${NRF_SDK_ROOT}/components/libraries/twi_sensor
-  # ${NRF_SDK_ROOT}/components/libraries/gpiote
   ${NRF_SDK_ROOT}/components/softdevice/common
   ${NRF_SDK_ROOT}/components/softdevice/mbr/headers
   ${NRF_SDK_ROOT}/components/softdevice/s132/headers
@@ -61,7 +58,6 @@ set(
   ${NRF_SDK_ROOT}/components/toolchain/cmsis/include
   ${NRF_SDK_ROOT}/external/fprintf
   ${NRF_SDK_ROOT}/external/segger_rtt
-  # ${NRF_SDK_ROOT}/external/micro-ecc/micro-ecc
   ${NRF_SDK_ROOT}/external/nano-pb
   ${NRF_SDK_ROOT}/external/nrf_oberon
   ${NRF_SDK_ROOT}/external/nrf_oberon/include
@@ -144,7 +140,6 @@ set(
   ${NRF_SDK_ROOT}/components/softdevice/common/nrf_sdh_soc.c
   ${NRF_SDK_ROOT}/components/libraries/log/src/nrf_log_backend_rtt.c
   ${NRF_SDK_ROOT}/components/libraries/log/src/nrf_log_backend_serial.c
-  # ${NRF_SDK_ROOT}/components/libraries/log/src/nrf_log_backend_uart.c
   ${NRF_SDK_ROOT}/components/libraries/log/src/nrf_log_default_backends.c
   ${NRF_SDK_ROOT}/components/libraries/log/src/nrf_log_frontend.c
   ${NRF_SDK_ROOT}/components/libraries/log/src/nrf_log_str_formatter.c
@@ -155,24 +150,17 @@ set(
   ${NRF_SDK_ROOT}/external/fprintf/nrf_fprintf_format.c
   ${NRF_SDK_ROOT}/external/nano-pb/pb_common.c
   ${NRF_SDK_ROOT}/external/nano-pb/pb_decode.c
-  # ${NRF_SDK_ROOT}/integration/nrfx/legacy/nrf_drv_uart.c
-  # ${NRF_SDK_ROOT}/integration/nrfx/legacy/nrf_drv_twi.c
-  # ${NRF_SDK_ROOT}/modules/nrfx/drivers/src/nrfx_uart.c
   ${NRF_SDK_ROOT}/modules/nrfx/drivers/src/nrfx_uarte.c
   ${NRF_SDK_ROOT}/modules/nrfx/drivers/src/nrfx_twi.c
-  # ${NRF_SDK_ROOT}/modules/nrfx/drivers/src/nrfx_twim.c
-  # ${NRF_SDK_ROOT}/modules/nrfx/drivers/src/nrfx_gpiote.c
   ${NRF_SDK_ROOT}/modules/nrfx/drivers/src/prs/nrfx_prs.c
   ${NRF_SDK_ROOT}/modules/nrfx/hal/nrf_nvmc.c
   ${NRF_SDK_ROOT}/modules/nrfx/mdk/gcc_startup_nrf52.S
   ${NRF_SDK_ROOT}/modules/nrfx/mdk/system_nrf52.c
   ${NRF_SDK_ROOT}/modules/nrfx/soc/nrfx_atomic.c
-  # ${NRF_SDK_ROOT}/external/micro-ecc/micro-ecc/uECC.c
 )
 
 set(NRF_SDK_LINK
   ${NRF_SDK_ROOT}/external/nrf_oberon/lib/cortex-m4/hard-float/liboberon_3.0.1.a
-  # ${NRF_SDK_ROOT}/external/micro-ecc/nrf52hf_armgcc/armgcc/micro_ecc_lib_nrf52.a
 )
 
 ###############################
@@ -196,7 +184,7 @@ target_compile_options(
   # Optimization flags
   -Os -g0 -s
   # Uncomment the line below to enable link time optimization
-  -flto=auto
+  # -flto=auto
   # C flags common to all targets
   -DFLOAT_ABI_HARD
   -DuECC_ENABLE_VLI_API=0
@@ -204,30 +192,29 @@ target_compile_options(
   -DuECC_SQUARE_FUNC=0
   -DuECC_SUPPORT_COMPRESSED_POINT=0
   -DuECC_VLI_NATIVE_LITTLE_ENDIAN=1
+  -Wall -Werror -Wno-unused-function
   -mcpu=cortex-m4
   -mthumb -mabi=aapcs
-  # -Wall -Werror
-  -Wall -Werror
   -mfloat-abi=hard -mfpu=fpv4-sp-d16
   # keep every function in a separate section, this allows linker to discard unused ones
-  -ffunction-sections -fdata-sections -fno-strict-aliasing
-  -fno-builtin -fshort-enums -Wno-unused-function
-  # heap and stack
-  -D__HEAP_SIZE=4096
-  -D__STACK_SIZE=4096
+  -ffunction-sections -fdata-sections -fno-strict-aliasing -fno-builtin -fshort-enums 
+  # heap and stack (why set them for a library?)
+  # -D__HEAP_SIZE=4096
+  # -D__STACK_SIZE=4096
 )
 
 target_link_options(
   MicroECC PRIVATE
   # Linker flags
   -Os -g0 -s
-  -mthumb -mabi=aapcs -L${NRF_SDK_ROOT}/modules/nrfx/mdk -T${MicroECC_DIR}/nrf52hf_armgcc/armgcc/ext_micro_ecc_gcc_nRF5x.ld
-  -mcpu=cortex-m4
-  -mfloat-abi=hard -mfpu=fpv4-sp-d16
   # let linker dump unused sections
   -Wl,--gc-sections
+  -mcpu=cortex-m4
+  -mthumb -mabi=aapcs
+  -mfloat-abi=hard -mfpu=fpv4-sp-d16
   # use newlib in nano version
   --specs=nano.specs -lc -lnosys -lm
+  -L${NRF_SDK_ROOT}/modules/nrfx/mdk -T${MicroECC_DIR}/nrf52hf_armgcc/armgcc/ext_micro_ecc_gcc_nRF5x.ld
 )
 
 ###############################
@@ -259,7 +246,7 @@ target_compile_options(
   # -Og -ggdb
   -Os -g0
   # Uncomment the line below to enable link time optimization
-  -flto=auto
+  # -flto=auto
   # C flags common to all targets
   -DBLE_STACK_SUPPORT_REQD
   -DCONFIG_GPIO_AS_PINRESET
@@ -267,7 +254,6 @@ target_compile_options(
   -DMBR_PRESENT
   -DNRF52
   -DNRF52832_XXAA
-  # -DNRF52_PAN_74
   -DNRF_DFU_DEBUG_VERSION
   -DNRF_DFU_SETTINGS_VERSION=2
   -DNRF_DFU_SVCI_ENABLED
@@ -283,15 +269,14 @@ target_compile_options(
   -DuECC_SUPPORT_COMPRESSED_POINT=0
   -DuECC_VLI_NATIVE_LITTLE_ENDIAN=1
   # -Wall -Werror
-  -Wall
+  -Wall -Wno-array-bounds
   -mcpu=cortex-m4
   -mthumb -mabi=aapcs
   -mfloat-abi=hard -mfpu=fpv4-sp-d16
   # keep every function in a separate section, this allows linker to discard unused ones
-  -ffunction-sections -fdata-sections -fno-strict-aliasing
-  -fno-builtin -fshort-enums
-  # heap and stack (why set them for a library?)
-  # -D__HEAP_SIZE=0
+  -ffunction-sections -fdata-sections -fno-strict-aliasing -fno-builtin -fshort-enums
+  # heap and stack
+  -D__HEAP_SIZE=0
 )
 
 target_link_options(
@@ -299,11 +284,11 @@ target_link_options(
   # Linker flags
   # -Og -ggdb
   -Os -g0
+  # let linker dump unused sections
+  -Wl,--gc-sections
   -mcpu=cortex-m4
   -mthumb -mabi=aapcs
   -mfloat-abi=hard -mfpu=fpv4-sp-d16
-  # let linker dump unused sections
-  -Wl,--gc-sections
   # use newlib in nano version
   --specs=nano.specs -lc -lnosys -lm
   -L${NRF_SDK_ROOT}/modules/nrfx/mdk -T${PROJECT_SOURCE_DIR}/secure_bootloader_gcc_nrf52.ld

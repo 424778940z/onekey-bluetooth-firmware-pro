@@ -120,7 +120,8 @@ typedef struct
     bool* isInitialized;
     bool (*Init)(void);
     bool (*Deinit)(void);
-    bool (*Reset)(void);
+    void (*Reset)(void);
+    void (*HighDriveStrengthCtrl)(bool);
     bool (*Send)(const uint8_t device_addr, const uint32_t len, const uint8_t* const data); // iic host send
     bool (*Receive)(const uint8_t device_addr, const uint32_t len, uint8_t* const data);    // iic host receive
     void (*Irq)(const uint64_t irq);                                                        // passed irq out

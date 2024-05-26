@@ -465,7 +465,6 @@ static void on_data_obj_create_request(nrf_dfu_request_t * p_req, nrf_dfu_respon
                  s_dfu_settings.progress.firmware_image_crc);
 }
 
-
 static void on_data_obj_write_request(nrf_dfu_request_t * p_req, nrf_dfu_response_t * p_res)
 {
     uint8_t trans_persent[2];

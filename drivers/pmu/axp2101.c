@@ -294,14 +294,14 @@ Power_Error_t axp2101_set_state(const Power_State_t state)
         break;
     case PWR_STATE_ON:
         // strong drive
-        nrf_i2c_strong_drive_ctrl(true);
+        pmu_interface_p->HighDriveStrengthCtrl(true);
         // open output
         EC_E_BOOL_R_BOOL(axp2101_reg_write(AXP2101_LDO_EN_CFG0, 0x01)); // aldo1 on, other off
         EC_E_BOOL_R_BOOL(axp2101_reg_write(AXP2101_LDO_EN_CFG1, 0X00)); // all off
         EC_E_BOOL_R_BOOL(axp2101_reg_write(AXP2101_DCDC_CFG0, 0x01));   // dcdc1 on, other off
         EC_E_BOOL_R_BOOL(axp2101_reg_write(AXP2101_DCDC_CFG1, 0x00));   // all off
         // normal drive
-        nrf_i2c_strong_drive_ctrl(false);
+        pmu_interface_p->HighDriveStrengthCtrl(false);
         break;
     case PWR_STATE_SLEEP:
         // allow irq wakeup
@@ -316,11 +316,11 @@ Power_Error_t axp2101_set_state(const Power_State_t state)
         break;
     case PWR_STATE_WAKEUP:
         // strong drive
-        nrf_i2c_strong_drive_ctrl(true);
+        pmu_interface_p->HighDriveStrengthCtrl(true);
         // wakeup via i2c
         EC_E_BOOL_R_PWR_ERR(axp2101_set_bits(AXP2101_SLEEP_CFG, (1 << 1)));
         // normal drive
-        nrf_i2c_strong_drive_ctrl(false);
+        pmu_interface_p->HighDriveStrengthCtrl(false);
         break;
 
     case PWR_STATE_INVALID:

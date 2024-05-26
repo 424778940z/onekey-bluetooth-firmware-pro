@@ -61,9 +61,6 @@
 #include "ble_dis.h"
 #include "ble_hci.h"
 #include "ble_nus.h"
-// #include "bsp_btn_ble.h"
-// #include "fds.h"
-// #include "fds_internal_defs.h"
 #include "nordic_common.h"
 #include "nrf.h"
 #include "nrf_ble_gatt.h"
@@ -87,8 +84,6 @@
 #include "nrf_crypto_init.h"
 #include "nrf_delay.h"
 #include "nrf_drv_wdt.h"
-// #include "nrf_fstorage.h"
-// #include "nrf_fstorage_sd.h"
 #include "nrf_power.h"
 #include "nrf_uarte.h"
 #include "nrfx_gpiote.h"
@@ -101,7 +96,6 @@
 #include "firmware_config.h"
 #include "dfu_upgrade.h"
 #include "util_macros.h"
-// #include "rtc_calendar.h"
 
 #define RX_PIN_NUMBER           11
 #define TX_PIN_NUMBER           12
@@ -1258,9 +1252,9 @@ static void services_init(void)
 static void timers_init(void)
 {
     ret_code_t err_code;
-    NRF_LOG_INFO("Debug logging for UART over RTT started13 start.");
+
+    // Initialize timer module.
     err_code = app_timer_init();
-    // NRF_LOG_INFO("Debug logging for UART over RTT started13.");
     APP_ERROR_CHECK(err_code);
 
     // Create timers.

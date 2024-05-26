@@ -269,12 +269,12 @@ Power_Error_t axp216_set_state(const Power_State_t state)
         break;
     case PWR_STATE_ON:
         // strong drive
-        nrf_i2c_strong_drive_ctrl(true);
+        pmu_interface_p->HighDriveStrengthCtrl(true);
         // open output
         EC_E_BOOL_R_BOOL(axp216_reg_write(AXP216_LDO_DC_EN2, 0x34));
         EC_E_BOOL_R_BOOL(axp216_reg_write(AXP216_LDO_DC_EN1, 0xC2));
         // normal drive
-        nrf_i2c_strong_drive_ctrl(false);
+        pmu_interface_p->HighDriveStrengthCtrl(false);
         break;
     case PWR_STATE_SLEEP:
         // backup reg
@@ -289,12 +289,12 @@ Power_Error_t axp216_set_state(const Power_State_t state)
         break;
     case PWR_STATE_WAKEUP:
         // strong drive
-        nrf_i2c_strong_drive_ctrl(true);
+        pmu_interface_p->HighDriveStrengthCtrl(true);
         // wakeup via i2c
         // EC_E_BOOL_R_PWR_ERR(axp216_set_bits(AXP216_VOFF_SET, (1 << 5))); // may not work, cant read while sleep
         EC_E_BOOL_R_BOOL(axp216_reg_write(AXP216_VOFF_SET, (reg31_bak | (1 << 5))));
         // normal drive
-        nrf_i2c_strong_drive_ctrl(false);
+        pmu_interface_p->HighDriveStrengthCtrl(false);
         break;
 
     case PWR_STATE_INVALID:

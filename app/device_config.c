@@ -2,10 +2,10 @@
 
 #include <memory.h>
 
-#include "util_macros.h"
-
-#include "nrf_flash.h"
 #include "crc32.h"
+
+#include "util_macros.h"
+#include "nrf_flash.h"
 #include "ecdsa.h"
 
 #define EC_E_BOOL_R_BOOL(expr) ExecuteCheck_ADV(expr, true, { return false; })

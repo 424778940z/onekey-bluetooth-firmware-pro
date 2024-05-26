@@ -1,5 +1,4 @@
 #include "flashled_manage.h"
-#include "nrf_log.h"
 
 ret_code_t set_led_brightness(uint8_t brightness)
 {
@@ -32,7 +31,6 @@ ret_code_t set_led_brightness(uint8_t brightness)
     nrf_delay_ms(100);
 
     ret = lm36011_write(LM36011_LED_STATUS, LED_FLASHLIGHT_MODE);
-    // NRF_LOG_INFO("setting status = %d", ret);
     return ret;
 }
 uint8_t get_led_brightness(void)
