@@ -164,58 +164,58 @@ int main(void)
     NRF_LOG_INFO("Reset Status -> %x", u32Reset_reason);
     NRF_LOG_FLUSH();
 
-    // try config axp216
-    EXEC_RETRY(
-        3,
-        {
-            NRF_LOG_INFO("AXP216 Config");
-            NRF_LOG_FLUSH();
-            nrf_gpio_cfg_default(PMIC_IRQ_IO);
-            nrf_gpio_cfg_default(PMIC_PWROK_IO);
-        },
-        {
-            switch ( axp216_minimum_config() )
-            {
-            case AXP216_CONF_BUS_ERR:
-                NRF_LOG_INFO("AXP216_CONF_BUS_ERR");
-                NRF_LOG_FLUSH();
-                return false;
-                break;
-            case AXP216_CONF_NO_ACK:
-                NRF_LOG_INFO("AXP216_CONF_NO_ACK");
-                NRF_LOG_FLUSH();
-                return false;
-                break;
-            case AXP216_CONF_NOT_NEEDED:
-                NRF_LOG_INFO("AXP216_CONF_NOT_NEEDED");
-                NRF_LOG_FLUSH();
-                return true;
-                break;
-            case AXP216_CONF_SUCCESS:
-                NRF_LOG_INFO("AXP216_CONF_SUCCESS");
-                NRF_LOG_FLUSH();
-                return true;
-                break;
-            case AXP216_CONF_FAILED:
-                NRF_LOG_INFO("AXP216_CONF_FAILED");
-                NRF_LOG_FLUSH();
-                return false;
-            case AXP216_CONF_INVALID:
-            default:
-                NRF_LOG_INFO("AXP216_CONF_INVALID");
-                NRF_LOG_FLUSH();
-                return false;
-            }
-        },
-        {
-            // do nothing on success
-        },
-        {
-            // sleep on fail
-            enter_low_power_mode();
-        }
-    );
-	
+    // // try config axp216
+    // EXEC_RETRY(
+    //     3,
+    //     {
+    //         NRF_LOG_INFO("AXP216 Config");
+    //         NRF_LOG_FLUSH();
+    //         nrf_gpio_cfg_default(PMIC_IRQ_IO);
+    //         nrf_gpio_cfg_default(PMIC_PWROK_IO);
+    //     },
+    //     {
+    //         switch ( axp216_minimum_config() )
+    //         {
+    //         case AXP216_CONF_BUS_ERR:
+    //             NRF_LOG_INFO("AXP216_CONF_BUS_ERR");
+    //             NRF_LOG_FLUSH();
+    //             return false;
+    //             break;
+    //         case AXP216_CONF_NO_ACK:
+    //             NRF_LOG_INFO("AXP216_CONF_NO_ACK");
+    //             NRF_LOG_FLUSH();
+    //             return false;
+    //             break;
+    //         case AXP216_CONF_NOT_NEEDED:
+    //             NRF_LOG_INFO("AXP216_CONF_NOT_NEEDED");
+    //             NRF_LOG_FLUSH();
+    //             return true;
+    //             break;
+    //         case AXP216_CONF_SUCCESS:
+    //             NRF_LOG_INFO("AXP216_CONF_SUCCESS");
+    //             NRF_LOG_FLUSH();
+    //             return true;
+    //             break;
+    //         case AXP216_CONF_FAILED:
+    //             NRF_LOG_INFO("AXP216_CONF_FAILED");
+    //             NRF_LOG_FLUSH();
+    //             return false;
+    //         case AXP216_CONF_INVALID:
+    //         default:
+    //             NRF_LOG_INFO("AXP216_CONF_INVALID");
+    //             NRF_LOG_FLUSH();
+    //             return false;
+    //         }
+    //     },
+    //     {
+    //         // do nothing on success
+    //     },
+    //     {
+    //         // sleep on fail
+    //         enter_low_power_mode();
+    //     }
+    // );
+
     // nrf_bootloader_mbr_addrs_populate(); // we dont use uicr address anymore
 
     // Protect MBR and bootloader flash area

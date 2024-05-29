@@ -197,19 +197,18 @@
 #define ADV_NAME_LENGTH           8
 #define MAC_ADDRESS_LENGTH        6
 
-#define DEAD_BEEF                                                                                           \
-    0xDEADBEEF /**< Value used as error code on stack dump, can be used to identify stack location on stack \
-                  unwind. */
+#define DEAD_BEEF \
+    0xDEADBEEF /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
 #define ADC_REF_VOLTAGE_IN_MILLIVOLTS 600 //!< Reference voltage (in milli volts) used by ADC while doing conversion.
 #define DIODE_FWD_VOLT_DROP_MILLIVOLTS \
-    90 // 270=0.3v  //!< Typical forward voltage drop of the diode (Part no: SD103ATW-7-F) that is connected
-       // in series with the voltage supply. This is the voltage drop when the forward current is 1mA. Source:
-       // Data sheet of 'SURFACE MOUNT SCHOTTKY BARRIER DIODE ARRAY' available at www.diodes.com.
+    90 // 270=0.3v  //!< Typical forward voltage drop of the diode (Part no: SD103ATW-7-F) that is connected in series
+       // with the voltage supply. This is the voltage drop when the forward current is 1mA. Source: Data sheet of
+       // 'SURFACE MOUNT SCHOTTKY BARRIER DIODE ARRAY' available at www.diodes.com.
 #define ADC_RES_10BIT 1024 //!< Maximum digital value for 10-bit ADC conversion.
 #define ADC_PRE_SCALING_COMPENSATION \
-    6 //!< The ADC is configured to use VDD with 1/3 prescaling as input. And hence the result of conversion
-      //!< is to be multiplied by 3 to get the actual value of the battery voltage.
+    6 //!< The ADC is configured to use VDD with 1/3 prescaling as input. And hence the result of conversion is to be
+      //!< multiplied by 3 to get the actual value of the battery voltage.
 #define ADC_RESULT_IN_MILLI_VOLTS(ADC_VALUE) \
     ((((ADC_VALUE) * ADC_REF_VOLTAGE_IN_MILLIVOLTS) / ADC_RES_10BIT) * ADC_PRE_SCALING_COMPENSATION)
 
@@ -276,6 +275,8 @@
 #define ST_SEND_OPEN_EMMC_PWR  0x03
 #define ST_REQ_POWER_PERCENT   0x04
 #define ST_REQ_USB_STATUS      0x05
+#define ST_REQ_ENABLE_CHARGE   0x06
+#define ST_REQ_DISABLE_CHARGE  0x07
 //
 #define ST_CMD_BLE_INFO       0x83
 #define ST_REQ_ADV_NAME       0x01
@@ -388,25 +389,23 @@ static char ble_adv_name[ADV_NAME_LENGTH];
 //     NRF_LOG_FINAL_FLUSH();
 // }
 
-static Power_Status_t pmu_status;
 static void pmu_status_refresh()
 {
-    pmu_p->GetStatus(&pmu_status);
+    pmu_p->PullStatus();
 
-    NRF_LOG_INFO("=== Power_Status_t ===");
-    NRF_LOG_INFO("isValid=%u", pmu_status.isValid);
-    NRF_LOG_INFO("batteryPresent=%u", pmu_status.batteryPresent);
-    NRF_LOG_INFO("batteryPercent=%u", pmu_status.batteryPercent);
-    NRF_LOG_INFO("batteryVoltage=%lu", pmu_status.batteryVoltage);
-    NRF_LOG_INFO("batteryTemp=%ld", pmu_status.batteryTemp);
-    NRF_LOG_INFO("pmuTemp=%lu", pmu_status.pmuTemp);
-    NRF_LOG_INFO("chargeAllowed=%u", pmu_status.chargeAllowed);
-    NRF_LOG_INFO("chargerAvailable=%u", pmu_status.chargerAvailable);
-    NRF_LOG_INFO("chargeFinished=%u", pmu_status.chargeFinished);
-    NRF_LOG_INFO("wiredCharge=%u", pmu_status.wiredCharge);
-    NRF_LOG_INFO("wirelessCharge=%u", pmu_status.wirelessCharge);
-    NRF_LOG_INFO("chargeCurrent=%lu", pmu_status.chargeCurrent);
-    NRF_LOG_INFO("dischargeCurrent=%lu", pmu_status.dischargeCurrent);
+    NRF_LOG_INFO("=== PowerStatus ===");
+    NRF_LOG_INFO("batteryPresent=%u", pmu_p->PowerStatus->batteryPresent);
+    NRF_LOG_INFO("batteryPercent=%u", pmu_p->PowerStatus->batteryPercent);
+    NRF_LOG_INFO("batteryVoltage=%lu", pmu_p->PowerStatus->batteryVoltage);
+    NRF_LOG_INFO("batteryTemp=%ld", pmu_p->PowerStatus->batteryTemp);
+    NRF_LOG_INFO("pmuTemp=%lu", pmu_p->PowerStatus->pmuTemp);
+    NRF_LOG_INFO("chargeAllowed=%u", pmu_p->PowerStatus->chargeAllowed);
+    NRF_LOG_INFO("chargerAvailable=%u", pmu_p->PowerStatus->chargerAvailable);
+    NRF_LOG_INFO("chargeFinished=%u", pmu_p->PowerStatus->chargeFinished);
+    NRF_LOG_INFO("wiredCharge=%u", pmu_p->PowerStatus->wiredCharge);
+    NRF_LOG_INFO("wirelessCharge=%u", pmu_p->PowerStatus->wirelessCharge);
+    NRF_LOG_INFO("chargeCurrent=%lu", pmu_p->PowerStatus->chargeCurrent);
+    NRF_LOG_INFO("dischargeCurrent=%lu", pmu_p->PowerStatus->dischargeCurrent);
     NRF_LOG_INFO("=== ============== ===");
     NRF_LOG_FLUSH();
 }
@@ -630,9 +629,9 @@ void battery_level_meas_timeout_handler(void* p_context)
     static uint8_t battery_percent = 0;
 
     UNUSED_PARAMETER(p_context);
-    if ( battery_percent != pmu_status.batteryPercent )
+    if ( battery_percent != pmu_p->PowerStatus->batteryPercent )
     {
-        battery_percent = pmu_status.batteryPercent;
+        battery_percent = pmu_p->PowerStatus->batteryPercent;
         if ( g_bas_update_flag == 1 )
         {
             err_code = ble_bas_battery_level_update(&m_bas, battery_percent, BLE_CONN_HANDLE_ALL);
@@ -887,7 +886,7 @@ static void gap_params_init(void)
 #endif
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&sec_mode);
 
-    err_code = sd_ble_gap_device_name_set(&sec_mode, (const uint8_t*)ble_adv_name, strlen(ble_adv_name));
+    err_code = sd_ble_gap_device_name_set(&sec_mode, (const uint8_t*)ble_adv_name, sizeof(ble_adv_name));
     APP_ERROR_CHECK(err_code);
 
     memset(&gap_conn_params, 0, sizeof(gap_conn_params));
@@ -1704,6 +1703,12 @@ void uart_event_handle(app_uart_evt_t* p_event)
                 case ST_REQ_USB_STATUS:
                     pwr_status_flag = PWR_USB_STATUS;
                     break;
+                case ST_REQ_ENABLE_CHARGE:
+                    pmu_p->SetFeature(PWR_FEAT_CHARGE, true); // enable charge
+                    break;
+                case ST_REQ_DISABLE_CHARGE:
+                    pmu_p->SetFeature(PWR_FEAT_CHARGE, false); // disable charge
+                    break;
                 default:
                     pwr_status_flag = PWR_DEF;
                     break;
@@ -2190,20 +2195,17 @@ static void rsp_st_uart_cmd(void* p_event_data, uint16_t event_size)
         if ( deviceConfig_p->keystore.flag_locked == DEVICE_CONFIG_FLAG_MAGIC )
         {
             bak_buff[1] = BLE_KEY_RESP_FAILED;
-            NRF_LOG_INFO("send_stm_data 010");
             send_stm_data(bak_buff, 2);
         }
         else if ( !deviceCfg_keystore_validate(&(deviceConfig_p->keystore)) )
         {
             bak_buff[1] = BLE_KEY_RESP_FAILED;
-            NRF_LOG_INFO("send_stm_data 011");
             send_stm_data(bak_buff, 2);
         }
         else
         {
             bak_buff[1] = BLE_KEY_RESP_PUBKEY;
             memcpy(&bak_buff[2], deviceConfig_p->keystore.public_key, sizeof(deviceConfig_p->keystore.public_key));
-            NRF_LOG_INFO("send_stm_data 012");
             send_stm_data(bak_buff, sizeof(deviceConfig_p->keystore.public_key) + 2);
         }
 
@@ -2215,7 +2217,6 @@ static void rsp_st_uart_cmd(void* p_event_data, uint16_t event_size)
         bak_buff[0] = BLE_CMD_KEY_RESP;
         bak_buff[1] =
             (deviceCfg_keystore_lock(&(deviceConfig_p->keystore)) ? BLE_KEY_RESP_SUCCESS : BLE_KEY_RESP_FAILED);
-        NRF_LOG_INFO("send_stm_data 013");
         send_stm_data(bak_buff, 2);
         trans_info_flag = DEF_RESP;
     }
@@ -2227,14 +2228,12 @@ static void rsp_st_uart_cmd(void* p_event_data, uint16_t event_size)
         if ( !deviceCfg_keystore_validate(&(deviceConfig_p->keystore)) )
         {
             bak_buff[1] = BLE_KEY_RESP_FAILED;
-            NRF_LOG_INFO("send_stm_data 014");
             send_stm_data(bak_buff, 2);
         }
         else
         {
             bak_buff[1] = BLE_KEY_RESP_SIGN;
             sign_ecdsa_msg(deviceConfig_p->keystore.private_key, uart_data_array + 6, msg_len, bak_buff + 2);
-            NRF_LOG_INFO("send_stm_data 015");
             send_stm_data(bak_buff, 64 + 2);
         }
         trans_info_flag = DEF_RESP;
@@ -2284,11 +2283,11 @@ static void manage_bat_level(void* p_event_data, uint16_t event_size)
 {
     static uint8_t bak_bat_persent = 0x00;
 
-    if ( bak_bat_persent != pmu_status.batteryPercent )
+    if ( bak_bat_persent != pmu_p->PowerStatus->batteryPercent )
     {
-        bak_bat_persent = pmu_status.batteryPercent;
+        bak_bat_persent = pmu_p->PowerStatus->batteryPercent;
         bak_buff[0] = BLE_SYSTEM_POWER_PERCENT;
-        bak_buff[1] = pmu_status.batteryPercent;
+        bak_buff[1] = pmu_p->PowerStatus->batteryPercent;
         NRF_LOG_INFO("send_stm_data 018");
         send_stm_data(bak_buff, 2);
     }
@@ -2396,17 +2395,19 @@ static void ble_ctl_process(void* p_event_data, uint16_t event_size)
     case PWR_BAT_PERCENT:
         pwr_status_flag = PWR_DEF;
         bak_buff[0] = BLE_SYSTEM_POWER_PERCENT;
-        bak_buff[1] = pmu_status.batteryPercent;
+        bak_buff[1] = pmu_p->PowerStatus->batteryPercent;
         send_stm_data(bak_buff, 2);
         break;
     case PWR_USB_STATUS:
         pwr_status_flag = PWR_DEF;
         bak_buff[0] = BLE_CMD_POWER_STA;
 
-        if ( pmu_status.chargerAvailable )
+        if ( pmu_p->PowerStatus->chargerAvailable )
         {
-            bak_buff[1] = ((pmu_status.chargeFinished && pmu_status.chargeAllowed) ? BLE_CHAGE_OVER : BLE_CHARGING_PWR);
-            bak_buff[2] = (pmu_status.wiredCharge ? AXP_CHARGE_TYPE_USB : AXP_CHARGE_TYPE_WIRELESS);
+            bak_buff[1] =
+                ((pmu_p->PowerStatus->chargeFinished && pmu_p->PowerStatus->chargeAllowed) ? BLE_CHAGE_OVER
+                                                                                           : BLE_CHARGING_PWR);
+            bak_buff[2] = (pmu_p->PowerStatus->wiredCharge ? AXP_CHARGE_TYPE_USB : AXP_CHARGE_TYPE_WIRELESS);
         }
         else
         {
@@ -2414,7 +2415,6 @@ static void ble_ctl_process(void* p_event_data, uint16_t event_size)
             bak_buff[2] = 0;
         }
         send_stm_data(bak_buff, 3);
-        pwr_status_flag = PWR_DEF;
         break;
     default:
         break;
@@ -2464,16 +2464,16 @@ static void bat_msg_report_process(void* p_event_data, uint16_t event_size)
     switch ( bat_msg_flag )
     {
     case SEND_BAT_VOL:
-        val = pmu_status.batteryVoltage;
+        val = pmu_p->PowerStatus->batteryVoltage;
         break;
     case SEND_BAT_CHARGE_CUR:
-        val = pmu_status.chargeCurrent;
+        val = pmu_p->PowerStatus->chargeCurrent;
         break;
     case SEND_BAT_DISCHARGE_CUR:
-        val = pmu_status.dischargeCurrent;
+        val = pmu_p->PowerStatus->dischargeCurrent;
         break;
     case SEND_BAT_INNER_TEMP:
-        val = (uint16_t)(pmu_status.batteryTemp);
+        val = (uint16_t)(pmu_p->PowerStatus->batteryTemp);
         break;
     default:
         return;
