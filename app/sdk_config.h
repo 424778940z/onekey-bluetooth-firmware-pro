@@ -3677,7 +3677,7 @@
 // <4=> Debug 
 
 #ifndef NRFX_TWIM_CONFIG_LOG_LEVEL
-#define NRFX_TWIM_CONFIG_LOG_LEVEL 0
+#define NRFX_TWIM_CONFIG_LOG_LEVEL 3
 #endif
 
 // <o> NRFX_TWIM_CONFIG_INFO_COLOR  - ANSI escape code prefix.
@@ -7274,7 +7274,7 @@
 // <e> TWI_CONFIG_LOG_ENABLED - Enables logging in the module.
 //==========================================================
 #ifndef TWI_CONFIG_LOG_ENABLED
-#define TWI_CONFIG_LOG_ENABLED 1
+#define TWI_CONFIG_LOG_ENABLED 0
 #endif
 // <o> TWI_CONFIG_LOG_LEVEL  - Default Severity level
  

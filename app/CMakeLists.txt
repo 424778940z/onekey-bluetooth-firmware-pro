@@ -47,33 +47,6 @@ set(
   ${NRF_SDK_ROOT}/components/ble/nrf_ble_gq
   ${NRF_SDK_ROOT}/components/ble/nrf_ble_qwr
   ${NRF_SDK_ROOT}/components/ble/peer_manager
-  # ${NRF_SDK_ROOT}/components/nfc/ndef/conn_hand_parser
-  # ${NRF_SDK_ROOT}/components/nfc/ndef/conn_hand_parser/ac_rec_parser
-  # ${NRF_SDK_ROOT}/components/nfc/ndef/conn_hand_parser/ble_oob_advdata_parser
-  # ${NRF_SDK_ROOT}/components/nfc/ndef/conn_hand_parser/le_oob_rec_parser
-  # ${NRF_SDK_ROOT}/components/nfc/ndef/connection_handover/ac_rec
-  # ${NRF_SDK_ROOT}/components/nfc/ndef/connection_handover/ble_oob_advdata
-  # ${NRF_SDK_ROOT}/components/nfc/ndef/connection_handover/ble_pair_lib
-  # ${NRF_SDK_ROOT}/components/nfc/ndef/connection_handover/ble_pair_msg
-  # ${NRF_SDK_ROOT}/components/nfc/ndef/connection_handover/common
-  # ${NRF_SDK_ROOT}/components/nfc/ndef/connection_handover/ep_oob_rec
-  # ${NRF_SDK_ROOT}/components/nfc/ndef/connection_handover/hs_rec
-  # ${NRF_SDK_ROOT}/components/nfc/ndef/connection_handover/le_oob_rec
-  # ${NRF_SDK_ROOT}/components/nfc/ndef/generic/message
-  # ${NRF_SDK_ROOT}/components/nfc/ndef/generic/record
-  # ${NRF_SDK_ROOT}/components/nfc/ndef/launchapp
-  # ${NRF_SDK_ROOT}/components/nfc/ndef/parser/message
-  # ${NRF_SDK_ROOT}/components/nfc/ndef/parser/record
-  # ${NRF_SDK_ROOT}/components/nfc/ndef/text
-  # ${NRF_SDK_ROOT}/components/nfc/ndef/uri
-  # ${NRF_SDK_ROOT}/components/nfc/platform
-  # ${NRF_SDK_ROOT}/components/nfc/t2t_lib
-  # ${NRF_SDK_ROOT}/components/nfc/t2t_parser
-  # ${NRF_SDK_ROOT}/components/nfc/t4t_lib
-  # ${NRF_SDK_ROOT}/components/nfc/t4t_parser/apdu
-  # ${NRF_SDK_ROOT}/components/nfc/t4t_parser/cc_file
-  # ${NRF_SDK_ROOT}/components/nfc/t4t_parser/hl_detection_procedure
-  # ${NRF_SDK_ROOT}/components/nfc/t4t_parser/tlv
   ${NRF_SDK_ROOT}/components/boards
   ${NRF_SDK_ROOT}/components/libraries/atomic
   ${NRF_SDK_ROOT}/components/libraries/atomic_fifo

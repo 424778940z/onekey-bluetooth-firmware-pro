@@ -88,6 +88,7 @@
 #include "nrf_uarte.h"
 #include "nrfx_gpiote.h"
 
+#include "util_macros.h"
 #include "ecdsa.h"
 #include "power_manage.h"
 #include "flashled_manage.h"
@@ -95,7 +96,6 @@
 #include "device_config.h"
 #include "firmware_config.h"
 #include "dfu_upgrade.h"
-#include "util_macros.h"
 
 #define RX_PIN_NUMBER           11
 #define TX_PIN_NUMBER           12
@@ -427,7 +427,6 @@ static ble_uuid_t m_adv_uuids[] =                        /**< Universally unique
         {BLE_UUID_BATTERY_SERVICE, BLE_UUID_TYPE_BLE},
         {BLE_UUID_NUS_SERVICE, BLE_UUID_TYPE_BLE}};
 
-// static void advertising_start(void);
 #ifdef SCHED_ENABLE
 static void twi_write_data(void* p_event_data, uint16_t event_size);
 #endif
@@ -441,12 +440,9 @@ static void uart_put_data(uint8_t* pdata, uint8_t lenth);
 static void send_stm_data(uint8_t* pdata, uint8_t lenth);
 static uint8_t calcXor(uint8_t* buf, uint8_t len);
 
-// static void advertising_start(void);
-// static void advertising_stop(void);
 static bool bt_advertising_ctrl(bool enable, bool commit);
 static void idle_state_handle(void);
 
-// static void fstorage_evt_handler(nrf_fstorage_evt_t* p_evt);
 static uint8_t bond_check_key_flag = INIT_VALUE;
 static uint8_t rcv_head_flag = 0;
 static uint8_t ble_status_flag = 0;
@@ -789,7 +785,6 @@ static void pm_evt_handler(const pm_evt_t* p_evt)
                     ble_conn_nopair_flag = BLE_DEF;
                     bak_buff[0] = BLE_CMD_PAIR_STA;
                     bak_buff[1] = BLE_PAIR_SUCCESS;
-                    NRF_LOG_INFO("send_stm_data 01");
                     send_stm_data(bak_buff, 2);
                 }
 
@@ -820,7 +815,7 @@ static void pm_evt_handler(const pm_evt_t* p_evt)
 
     case PM_EVT_CONN_SEC_FAILED:
         m_conn_handle = BLE_CONN_HANDLE_INVALID;
-        NRF_LOG_INFO("send_stm_data 02");
+
         bak_buff[0] = BLE_CMD_PAIR_STA;
         bak_buff[1] = BLE_PAIR_FAIL;
         send_stm_data(bak_buff, 2);
@@ -1385,7 +1380,7 @@ static void ble_evt_handler(const ble_evt_t* p_ble_evt, void* p_context)
             ble_evt_flag = BLE_DISCONNECT;
             bond_check_key_flag = INIT_VALUE;
             m_conn_handle = BLE_CONN_HANDLE_INVALID;
-            NRF_LOG_INFO("send_stm_data 03");
+
             bak_buff[0] = BLE_CMD_CON_STA;
             bak_buff[1] = BLE_DISCON_STATUS;
             send_stm_data(bak_buff, 2);
@@ -1405,7 +1400,7 @@ static void ble_evt_handler(const ble_evt_t* p_ble_evt, void* p_context)
         {
             NRF_LOG_INFO("Connected");
             ble_evt_flag = BLE_CONNECT;
-            NRF_LOG_INFO("send_stm_data 04");
+
             bak_buff[0] = BLE_CMD_CON_STA;
             bak_buff[1] = BLE_CON_STATUS;
             send_stm_data(bak_buff, 2);
@@ -1456,7 +1451,7 @@ static void ble_evt_handler(const ble_evt_t* p_ble_evt, void* p_context)
             char passkey[PASSKEY_LENGTH + 1];
             memcpy(passkey, p_ble_evt->evt.gap_evt.params.passkey_display.passkey, PASSKEY_LENGTH);
             passkey[PASSKEY_LENGTH] = 0;
-            NRF_LOG_INFO("send_stm_data 05");
+
             ble_conn_nopair_flag = BLE_PAIR;
             bak_buff[0] = BLE_CMD_PAIR_CODE;
             memcpy(&bak_buff[1], passkey, PASSKEY_LENGTH);
@@ -2120,13 +2115,11 @@ static void uart_put_data(uint8_t* pdata, uint8_t lenth)
 
 static void send_stm_data(uint8_t* pdata, uint8_t lenth)
 {
-    // NRF_LOG_INFO("send_stm_data called from line: %d", __LINE__);
     uart_trans_buff[0] = UART_TX_TAG2;
     uart_trans_buff[1] = UART_TX_TAG;
     uart_trans_buff[2] = 0x00;
     uart_trans_buff[3] = lenth + 1;
     memcpy(&uart_trans_buff[4], pdata, lenth);
-    // NRF_LOG_INFO("send_stm_data called from DATE: %d , %d", pdata[0], pdata[1]);
     uart_trans_buff[uart_trans_buff[3] + 3] = calcXor(uart_trans_buff, (uart_trans_buff[3] + 3));
 
     uart_put_data(uart_trans_buff, uart_trans_buff[3] + 4);
@@ -2166,7 +2159,6 @@ static void rsp_st_uart_cmd(void* p_event_data, uint16_t event_size)
     {
         bak_buff[0] = BLE_CMD_ADV_NAME;
         memcpy(&bak_buff[1], (uint8_t*)ble_adv_name, ADV_NAME_LENGTH);
-        NRF_LOG_INFO("send_stm_data 06");
         send_stm_data(bak_buff, 1 + ADV_NAME_LENGTH);
         trans_info_flag = DEF_RESP;
     }
@@ -2174,7 +2166,6 @@ static void rsp_st_uart_cmd(void* p_event_data, uint16_t event_size)
     {
         bak_buff[0] = BLE_FIRMWARE_VER;
         memcpy(&bak_buff[1], FW_REVISION, sizeof(FW_REVISION) - 1);
-        NRF_LOG_INFO("send_stm_data 07");
         send_stm_data(bak_buff, sizeof(FW_REVISION));
         trans_info_flag = DEF_RESP;
     }
@@ -2182,7 +2173,6 @@ static void rsp_st_uart_cmd(void* p_event_data, uint16_t event_size)
     {
         bak_buff[0] = BLE_SOFTDEVICE_VER;
         memcpy(&bak_buff[1], SW_REVISION, sizeof(SW_REVISION) - 1);
-        NRF_LOG_INFO("send_stm_data 08");
         send_stm_data(bak_buff, sizeof(SW_REVISION));
         trans_info_flag = DEF_RESP;
     }
@@ -2190,7 +2180,6 @@ static void rsp_st_uart_cmd(void* p_event_data, uint16_t event_size)
     {
         bak_buff[0] = BLE_BOOTLOADER_VER;
         memcpy(&bak_buff[1], BT_REVISION, sizeof(BT_REVISION) - 1);
-        NRF_LOG_INFO("send_stm_data 09");
         send_stm_data(bak_buff, sizeof(BT_REVISION));
         trans_info_flag = DEF_RESP;
     }
@@ -2254,7 +2243,6 @@ static void rsp_st_uart_cmd(void* p_event_data, uint16_t event_size)
     {
         bak_buff[0] = BLE_CMD_BUILD_ID;
         memcpy(&bak_buff[1], (uint8_t*)BUILD_ID, 7);
-        NRF_LOG_INFO("send_stm_data 016");
         send_stm_data(bak_buff, 8);
         trans_info_flag = DEF_RESP;
     }
@@ -2288,7 +2276,6 @@ static void rsp_st_uart_cmd(void* p_event_data, uint16_t event_size)
 
         bak_buff[0] = BLE_CMD_HASH;
         memcpy(&bak_buff[1], hash, 32);
-        NRF_LOG_INFO("send_stm_data 017");
         send_stm_data(bak_buff, 33);
         trans_info_flag = DEF_RESP;
     }
@@ -2338,7 +2325,6 @@ static void ble_ctl_process(void* p_event_data, uint16_t event_size)
         {
             bak_buff[0] = BLE_CMD_CON_STA;
             bak_buff[1] = BLE_ADV_OFF_STATUS;
-            NRF_LOG_INFO("send_stm_data 020");
             send_stm_data(bak_buff, 2);
         }
     }
@@ -2349,7 +2335,6 @@ static void ble_ctl_process(void* p_event_data, uint16_t event_size)
         {
             bak_buff[0] = BLE_CMD_CON_STA;
             bak_buff[1] = BLE_ADV_ON_STATUS;
-            NRF_LOG_INFO("send_stm_data 021");
             send_stm_data(bak_buff, 2);
 
             bt_advertising_ctrl(true, true);
@@ -2359,7 +2344,6 @@ static void ble_ctl_process(void* p_event_data, uint16_t event_size)
         {
             bak_buff[0] = BLE_CMD_CON_STA;
             bak_buff[1] = BLE_ADV_ON_STATUS;
-            NRF_LOG_INFO("send_stm_data 022");
             send_stm_data(bak_buff, 2);
         }
     }
@@ -2376,7 +2360,6 @@ static void ble_ctl_process(void* p_event_data, uint16_t event_size)
 
         bak_buff[0] = BLE_CMD_CON_STA;
         bak_buff[1] = BLE_DISCON_STATUS;
-        NRF_LOG_INFO("send_stm_data 23");
         send_stm_data(bak_buff, 2);
     }
     if ( BLE_CON == ble_conn_flag )
@@ -2384,7 +2367,6 @@ static void ble_ctl_process(void* p_event_data, uint16_t event_size)
         ble_conn_flag = BLE_DEF;
         bak_buff[0] = BLE_CMD_CON_STA;
         bak_buff[1] = ble_status_flag + 2;
-        NRF_LOG_INFO("send_stm_data 24");
         send_stm_data(bak_buff, 2);
     }
 
@@ -2420,14 +2402,16 @@ static void ble_ctl_process(void* p_event_data, uint16_t event_size)
     case PWR_USB_STATUS:
         pwr_status_flag = PWR_DEF;
         bak_buff[0] = BLE_CMD_POWER_STA;
-        bak_buff[1] = pmu_status.chargerAvailable;
-        if ( pmu_status.wiredCharge )
+
+        if ( pmu_status.chargerAvailable )
         {
-            bak_buff[2] = AXP_CHARGE_TYPE_USB;
+            bak_buff[1] = ((pmu_status.chargeFinished && pmu_status.chargeAllowed) ? BLE_CHAGE_OVER : BLE_CHARGING_PWR);
+            bak_buff[2] = (pmu_status.wiredCharge ? AXP_CHARGE_TYPE_USB : AXP_CHARGE_TYPE_WIRELESS);
         }
         else
         {
-            bak_buff[2] = AXP_CHARGE_TYPE_WIRELESS;
+            bak_buff[1] = BLE_REMOVE_POWER;
+            bak_buff[2] = 0;
         }
         send_stm_data(bak_buff, 3);
         pwr_status_flag = PWR_DEF;
@@ -2580,7 +2564,7 @@ int main(void)
         }
     );
     // soft power off ST until self init done
-    pmu_p->SetState(PWR_STATE_SOFT_OFF);
+    // pmu_p->SetState(PWR_STATE_SOFT_OFF);
     // device config init
     EXEC_RETRY(
         3, {}, { return device_config_init(); },
@@ -2600,10 +2584,10 @@ int main(void)
     // DFU Update
     // TODO: check battery?
     // TODO: change to on demand
-    NRF_LOG_INFO("DFU Update Seq.");
-    NRF_LOG_FLUSH();
-    NRF_LOG_INFO(try_dfu_upgrade(false) ? "DFU update not needed." : "DFU update failed!");
-    NRF_LOG_FLUSH();
+    // NRF_LOG_INFO("DFU Update Seq.");
+    // NRF_LOG_FLUSH();
+    // NRF_LOG_INFO(try_dfu_upgrade(false) ? "DFU update not needed." : "DFU update failed!");
+    // NRF_LOG_FLUSH();
 
     // ###############################
     // General Init Items

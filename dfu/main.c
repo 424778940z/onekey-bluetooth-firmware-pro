@@ -107,19 +107,7 @@ static void dfu_observer1(nrf_dfu_evt_type_t evt_type)
     case NRF_DFU_EVT_DFU_FAILED:
     case NRF_DFU_EVT_DFU_ABORTED:
     case NRF_DFU_EVT_DFU_INITIALIZED:
-#ifdef DEV_BOARD
-        bsp_board_init(BSP_INIT_LEDS);
-        bsp_board_led_on(BSP_BOARD_LED_0);
-        bsp_board_led_on(BSP_BOARD_LED_1);
-        bsp_board_led_off(BSP_BOARD_LED_2);
-#endif
-        break;
     case NRF_DFU_EVT_TRANSPORT_ACTIVATED:
-#ifdef DEV_BOARD
-        bsp_board_led_off(BSP_BOARD_LED_1);
-        bsp_board_led_on(BSP_BOARD_LED_2);
-#endif
-        break;
     case NRF_DFU_EVT_DFU_STARTED:
         break;
     default:
@@ -227,6 +215,7 @@ int main(void)
             enter_low_power_mode();
         }
     );
+	
     // nrf_bootloader_mbr_addrs_populate(); // we dont use uicr address anymore
 
     // Protect MBR and bootloader flash area
