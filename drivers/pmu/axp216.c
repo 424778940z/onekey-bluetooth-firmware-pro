@@ -253,8 +253,8 @@ Power_Error_t axp216_set_state(const Power_State_t state)
     {
     case PWR_STATE_SOFT_OFF:
         // close output
-        EC_E_BOOL_R_BOOL(axp216_reg_write(AXP216_LDO_DC_EN2, 0x15)); // keep eldo1 on
-        EC_E_BOOL_R_BOOL(axp216_reg_write(AXP216_LDO_DC_EN1, 0x00));
+        EC_E_BOOL_R_PWR_ERR(axp216_reg_write(AXP216_LDO_DC_EN2, 0x15)); // keep eldo1 on
+        EC_E_BOOL_R_PWR_ERR(axp216_reg_write(AXP216_LDO_DC_EN1, 0x00));
         // eldo1 is not used and not connected, keep it on is just for prevent axp "sleep"
         // "close all output means sleep" is a really stupid design, as axp turns off I2C when sleeping
         // there is no way to wake it up if you do't enable wakeup source before close all output
@@ -262,8 +262,8 @@ Power_Error_t axp216_set_state(const Power_State_t state)
         break;
     case PWR_STATE_HARD_OFF:
         // close output (not needed as the pmu off will kill all output)
-        // EC_E_BOOL_R_BOOL(axp216_reg_write(AXP216_LDO_DC_EN1, 0x00));
-        // EC_E_BOOL_R_BOOL(axp216_reg_write(AXP216_LDO_DC_EN2, 0x14));
+        // EC_E_BOOL_R_PWR_ERR(axp216_reg_write(AXP216_LDO_DC_EN1, 0x00));
+        // EC_E_BOOL_R_PWR_ERR(axp216_reg_write(AXP216_LDO_DC_EN2, 0x14));
         // pmu off
         EC_E_BOOL_R_PWR_ERR(axp216_set_bits(AXP216_OFF_CTL, (1 << 7)));
         break;
@@ -271,28 +271,28 @@ Power_Error_t axp216_set_state(const Power_State_t state)
         // strong drive
         pmu_interface_p->HighDriveStrengthCtrl(true);
         // open output
-        EC_E_BOOL_R_BOOL(axp216_reg_write(AXP216_LDO_DC_EN2, 0x34));
-        EC_E_BOOL_R_BOOL(axp216_reg_write(AXP216_LDO_DC_EN1, 0xC2));
+        EC_E_BOOL_R_PWR_ERR(axp216_reg_write(AXP216_LDO_DC_EN2, 0x34));
+        EC_E_BOOL_R_PWR_ERR(axp216_reg_write(AXP216_LDO_DC_EN1, 0xC2));
         // normal drive
         pmu_interface_p->HighDriveStrengthCtrl(false);
         break;
     case PWR_STATE_SLEEP:
         // backup reg
-        EC_E_BOOL_R_BOOL(axp216_reg_read(AXP216_VOFF_SET, &reg31_bak));
+        EC_E_BOOL_R_PWR_ERR(axp216_reg_read(AXP216_VOFF_SET, &reg31_bak));
         // allow irq wakeup
         // EC_E_BOOL_R_PWR_ERR(axp216_set_bits(AXP216_VOFF_SET, (1 << 4)));
         // enable wakeup
         EC_E_BOOL_R_PWR_ERR(axp216_set_bits(AXP216_VOFF_SET, (1 << 3)));
         // close output to sleep (that's how axp "sleep" works)
-        EC_E_BOOL_R_BOOL(axp216_reg_write(AXP216_LDO_DC_EN2, 0x14));
-        EC_E_BOOL_R_BOOL(axp216_reg_write(AXP216_LDO_DC_EN1, 0x00));
+        EC_E_BOOL_R_PWR_ERR(axp216_reg_write(AXP216_LDO_DC_EN2, 0x14));
+        EC_E_BOOL_R_PWR_ERR(axp216_reg_write(AXP216_LDO_DC_EN1, 0x00));
         break;
     case PWR_STATE_WAKEUP:
         // strong drive
         pmu_interface_p->HighDriveStrengthCtrl(true);
         // wakeup via i2c
         // EC_E_BOOL_R_PWR_ERR(axp216_set_bits(AXP216_VOFF_SET, (1 << 5))); // may not work, cant read while sleep
-        EC_E_BOOL_R_BOOL(axp216_reg_write(AXP216_VOFF_SET, (reg31_bak | (1 << 5))));
+        EC_E_BOOL_R_PWR_ERR(axp216_reg_write(AXP216_VOFF_SET, (reg31_bak | (1 << 5))));
         // normal drive
         pmu_interface_p->HighDriveStrengthCtrl(false);
         break;

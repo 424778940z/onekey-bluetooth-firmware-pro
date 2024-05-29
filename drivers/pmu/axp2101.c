@@ -274,10 +274,10 @@ Power_Error_t axp2101_set_state(const Power_State_t state)
     {
     case PWR_STATE_SOFT_OFF:
         // close output
-        EC_E_BOOL_R_BOOL(axp2101_reg_write(AXP2101_LDO_EN_CFG0, 0x40)); // keep cpuldo on
-        EC_E_BOOL_R_BOOL(axp2101_reg_write(AXP2101_LDO_EN_CFG1, 0x00));
-        EC_E_BOOL_R_BOOL(axp2101_reg_write(AXP2101_DCDC_CFG0, 0x00));
-        EC_E_BOOL_R_BOOL(axp2101_reg_write(AXP2101_DCDC_CFG1, 0x00));
+        EC_E_BOOL_R_PWR_ERR(axp2101_reg_write(AXP2101_LDO_EN_CFG0, 0x40)); // keep cpuldo on
+        EC_E_BOOL_R_PWR_ERR(axp2101_reg_write(AXP2101_LDO_EN_CFG1, 0x00));
+        EC_E_BOOL_R_PWR_ERR(axp2101_reg_write(AXP2101_DCDC_CFG0, 0x00));
+        EC_E_BOOL_R_PWR_ERR(axp2101_reg_write(AXP2101_DCDC_CFG1, 0x00));
         // cpuldo is not used and not connected, keep it on is just for prevent axp "sleep"
         // "close all output means sleep" is a really stupid design, as axp turns off I2C when sleeping
         // there is no way to wake it up if you do't enable wakeup source before close all output
@@ -285,10 +285,10 @@ Power_Error_t axp2101_set_state(const Power_State_t state)
         break;
     case PWR_STATE_HARD_OFF:
         // close output (not needed as the pmu off will kill all output)
-        // EC_E_BOOL_R_BOOL(axp2101_reg_write(AXP2101_DCDC_CFG0, 0x00));
-        // EC_E_BOOL_R_BOOL(axp2101_reg_write(AXP2101_DCDC_CFG1, 0x00));
-        // EC_E_BOOL_R_BOOL(axp2101_reg_write(AXP2101_LDO_EN_CFG0, 0x00));
-        // EC_E_BOOL_R_BOOL(axp2101_reg_write(AXP2101_LDO_EN_CFG1, 0x00));
+        // EC_E_BOOL_R_PWR_ERR(axp2101_reg_write(AXP2101_DCDC_CFG0, 0x00));
+        // EC_E_BOOL_R_PWR_ERR(axp2101_reg_write(AXP2101_DCDC_CFG1, 0x00));
+        // EC_E_BOOL_R_PWR_ERR(axp2101_reg_write(AXP2101_LDO_EN_CFG0, 0x00));
+        // EC_E_BOOL_R_PWR_ERR(axp2101_reg_write(AXP2101_LDO_EN_CFG1, 0x00));
         // pmu off
         EC_E_BOOL_R_PWR_ERR(axp2101_set_bits(AXP2101_COMM_CFG, (1 << 0)));
         break;
@@ -296,10 +296,10 @@ Power_Error_t axp2101_set_state(const Power_State_t state)
         // strong drive
         pmu_interface_p->HighDriveStrengthCtrl(true);
         // open output
-        EC_E_BOOL_R_BOOL(axp2101_reg_write(AXP2101_LDO_EN_CFG0, 0x01)); // aldo1 on, other off
-        EC_E_BOOL_R_BOOL(axp2101_reg_write(AXP2101_LDO_EN_CFG1, 0X00)); // all off
-        EC_E_BOOL_R_BOOL(axp2101_reg_write(AXP2101_DCDC_CFG0, 0x01));   // dcdc1 on, other off
-        EC_E_BOOL_R_BOOL(axp2101_reg_write(AXP2101_DCDC_CFG1, 0x00));   // all off
+        EC_E_BOOL_R_PWR_ERR(axp2101_reg_write(AXP2101_LDO_EN_CFG0, 0x01)); // aldo1 on, other off
+        EC_E_BOOL_R_PWR_ERR(axp2101_reg_write(AXP2101_LDO_EN_CFG1, 0X00)); // all off
+        EC_E_BOOL_R_PWR_ERR(axp2101_reg_write(AXP2101_DCDC_CFG0, 0x01));   // dcdc1 on, other off
+        EC_E_BOOL_R_PWR_ERR(axp2101_reg_write(AXP2101_DCDC_CFG1, 0x00));   // all off
         // normal drive
         pmu_interface_p->HighDriveStrengthCtrl(false);
         break;
@@ -309,10 +309,10 @@ Power_Error_t axp2101_set_state(const Power_State_t state)
         // enable wakeup
         EC_E_BOOL_R_PWR_ERR(axp2101_set_bits(AXP2101_SLEEP_CFG, (1 << 3)));
         // close output ("sleep")
-        EC_E_BOOL_R_BOOL(axp2101_reg_write(AXP2101_DCDC_CFG0, 0x00));
-        EC_E_BOOL_R_BOOL(axp2101_reg_write(AXP2101_DCDC_CFG1, 0x00));
-        EC_E_BOOL_R_BOOL(axp2101_reg_write(AXP2101_LDO_EN_CFG0, 0x00));
-        EC_E_BOOL_R_BOOL(axp2101_reg_write(AXP2101_LDO_EN_CFG1, 0x00));
+        EC_E_BOOL_R_PWR_ERR(axp2101_reg_write(AXP2101_DCDC_CFG0, 0x00));
+        EC_E_BOOL_R_PWR_ERR(axp2101_reg_write(AXP2101_DCDC_CFG1, 0x00));
+        EC_E_BOOL_R_PWR_ERR(axp2101_reg_write(AXP2101_LDO_EN_CFG0, 0x00));
+        EC_E_BOOL_R_PWR_ERR(axp2101_reg_write(AXP2101_LDO_EN_CFG1, 0x00));
         break;
     case PWR_STATE_WAKEUP:
         // strong drive
