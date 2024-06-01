@@ -78,7 +78,7 @@
 #include "peer_manager_handler.h"
 #include "sdk_macros.h"
 #include "app_scheduler.h"
-#include "ble_dfu.h"
+// #include "ble_dfu.h"
 #include "nrf_bootloader_info.h"
 #include "nrf_crypto.h"
 #include "nrf_crypto_init.h"
@@ -565,6 +565,7 @@ static bool app_shutdown_handler(nrf_pwr_mgmt_evt_t event)
         bt_advertising_ctrl(false, false);
         // enable wakeup
         nrf_gpio_cfg_sense_input(PMIC_PWROK_IO, NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_SENSE_HIGH);
+        nrf_gpio_cfg_sense_input(PMIC_IRQ_IO, NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_SENSE_HIGH);
         return true;
 
     case NRF_PWR_MGMT_EVT_PREPARE_DFU:
@@ -616,7 +617,8 @@ static inline void gpio_uninit(void)
 
 static void enter_low_power_mode(void)
 {
-    pmu_p->Deinit();
+    if ( (pmu_p != NULL) && (pmu_p->isInitialized) )
+        pmu_p->Deinit();
     gpio_uninit();
     nrf_gpio_cfg_default(ST_WAKE_IO);
     app_uart_close();
@@ -946,21 +948,6 @@ static void gatt_init(void)
 static void nrf_qwr_error_handler(uint32_t nrf_error)
 {
     APP_ERROR_HANDLER(nrf_error);
-}
-
-static void disconnect(uint16_t conn_handle, void* p_context)
-{
-    UNUSED_PARAMETER(p_context);
-
-    ret_code_t err_code = sd_ble_gap_disconnect(conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
-    if ( err_code != NRF_SUCCESS )
-    {
-        NRF_LOG_WARNING("Failed to disconnect connection. Connection handle: %d Error: %d", conn_handle, err_code);
-    }
-    else
-    {
-        NRF_LOG_DEBUG("Disconnected connection handle %d", conn_handle);
-    }
 }
 
 #ifdef BUTTONLESS_ENABLED
@@ -2029,11 +2016,10 @@ static void idle_state_handle(void)
 
 void in_gpiote_handler(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t action)
 {
-    NRF_LOG_INFO("NRF IRQ  in_gpiote_handler  begin  ...");
-    NRF_LOG_FLUSH();
     switch ( pin )
     {
     case SLAVE_SPI_RSP_IO:
+        NRF_LOG_INFO("GPIO IRQ -> SLAVE_SPI_RSP_IO");
         if ( spi_dir_out )
         {
             spi_send_done = true;
@@ -2044,6 +2030,7 @@ void in_gpiote_handler(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t action)
         }
         break;
     case PMIC_PWROK_IO:
+        NRF_LOG_INFO("GPIO IRQ -> PMIC_PWROK_IO");
         if ( action == NRF_GPIOTE_POLARITY_HITOLO )
         {
             enter_low_power_mode();
@@ -2052,6 +2039,7 @@ void in_gpiote_handler(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t action)
     default:
         break;
     }
+    NRF_LOG_FLUSH();
 }
 
 static void gpio_int_handler_pmu(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t action)
@@ -2314,7 +2302,6 @@ static void ble_ctl_process(void* p_event_data, uint16_t event_size)
         {
             bak_buff[0] = BLE_CMD_CON_STA;
             bak_buff[1] = BLE_ADV_OFF_STATUS;
-            NRF_LOG_INFO("send_stm_data 019");
             send_stm_data(bak_buff, 2);
 
             bt_disconnect();
@@ -2404,9 +2391,10 @@ static void ble_ctl_process(void* p_event_data, uint16_t event_size)
 
         if ( pmu_p->PowerStatus->chargerAvailable )
         {
-            bak_buff[1] =
-                ((pmu_p->PowerStatus->chargeFinished && pmu_p->PowerStatus->chargeAllowed) ? BLE_CHAGE_OVER
-                                                                                           : BLE_CHARGING_PWR);
+            // bak_buff[1] =
+            //     ((pmu_p->PowerStatus->chargeFinished && pmu_p->PowerStatus->chargeAllowed) ? BLE_CHAGE_OVER
+            //                                                                                : BLE_CHARGING_PWR);
+            bak_buff[1] = BLE_CHARGING_PWR;
             bak_buff[2] = (pmu_p->PowerStatus->wiredCharge ? AXP_CHARGE_TYPE_USB : AXP_CHARGE_TYPE_WIRELESS);
         }
         else
@@ -2509,7 +2497,6 @@ static void m_wdt_event_handler(void)
 {
     NRF_LOG_INFO("WDT Triggered!");
     NRF_LOG_FLUSH();
-    // NVIC_SystemReset(); // needed?
 }
 
 static void watch_dog_init(void)

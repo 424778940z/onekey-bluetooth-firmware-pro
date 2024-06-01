@@ -118,8 +118,8 @@ static void apply_config(nrfx_uarte_t        const * p_instance,
     }
     if (p_config->pselrxd != NRF_UARTE_PSEL_DISCONNECTED)
     {
-        nrf_gpio_cfg_input(p_config->pselrxd, NRF_GPIO_PIN_NOPULL);
-        // nrf_gpio_cfg_input(p_config->pselrxd, NRF_GPIO_PIN_PULLUP); // TODO: why?
+        // nrf_gpio_cfg_input(p_config->pselrxd, NRF_GPIO_PIN_NOPULL);
+        nrf_gpio_cfg_input(p_config->pselrxd, NRF_GPIO_PIN_PULLUP); // TODO: why?
     }
 
     nrf_uarte_baudrate_set(p_instance->p_reg, p_config->baudrate);
@@ -438,6 +438,9 @@ nrfx_err_t nrfx_uarte_rx(nrfx_uarte_t const * p_instance,
     }
 
     NRFX_LOG_INFO("Transfer rx_len: %d.", length);
+    NRFX_LOG_DEBUG("Rx data:");
+    NRFX_LOG_HEXDUMP_DEBUG(p_cb->p_rx_buffer,
+                           p_cb->rx_buffer_length * sizeof(p_cb->p_rx_buffer[0]));
 
     err_code = NRFX_SUCCESS;
 

@@ -60,7 +60,6 @@ set(
   ${NRF_SDK_ROOT}/components/softdevice/s132/headers/nrf52
   ${NRF_SDK_ROOT}/components/toolchain/cmsis/include
   ${NRF_SDK_ROOT}/external/fprintf
-  ${NRF_SDK_ROOT}/external/segger_rtt
   ${NRF_SDK_ROOT}/external/nano-pb
   ${NRF_SDK_ROOT}/external/nrf_oberon
   ${NRF_SDK_ROOT}/external/nrf_oberon/include
@@ -75,13 +74,15 @@ set(
 set(
   NRF_SDK_SRC
   ${NRF_SDK_ROOT}/components/ble/common/ble_srv_common.c
+  ${NRF_SDK_ROOT}/components/boards/boards.c
   ${NRF_SDK_ROOT}/components/drivers_nrf/nrf_soc_nosd/nrf_nvic.c
   ${NRF_SDK_ROOT}/components/drivers_nrf/nrf_soc_nosd/nrf_soc.c
   ${NRF_SDK_ROOT}/components/libraries/atomic/nrf_atomic.c
   ${NRF_SDK_ROOT}/components/libraries/atomic_fifo/nrf_atfifo.c
   ${NRF_SDK_ROOT}/components/libraries/balloc/nrf_balloc.c
   ${NRF_SDK_ROOT}/components/libraries/bootloader/serial_dfu/nrf_dfu_serial.c
-  ${NRF_SDK_ROOT}/components/libraries/bootloader/serial_dfu/nrf_dfu_serial_uart.c
+  # ${NRF_SDK_ROOT}/components/libraries/bootloader/serial_dfu/nrf_dfu_serial_uart.c
+  ${PROJECT_SOURCE_DIR}/nrf_dfu_serial_uart.c # use old version instead
   ${NRF_SDK_ROOT}/components/libraries/bootloader/dfu/dfu-cc.pb.c
   ${NRF_SDK_ROOT}/components/libraries/bootloader/dfu/nrf_dfu.c
   ${NRF_SDK_ROOT}/components/libraries/bootloader/dfu/nrf_dfu_flash.c
@@ -124,8 +125,8 @@ set(
   ${NRF_SDK_ROOT}/components/libraries/fstorage/nrf_fstorage.c
   ${NRF_SDK_ROOT}/components/libraries/fstorage/nrf_fstorage_nvmc.c
   ${NRF_SDK_ROOT}/components/libraries/fstorage/nrf_fstorage_sd.c
-  ${NRF_SDK_ROOT}/components/libraries/hardfault/nrf52/handler/hardfault_handler_gcc.c
-  ${NRF_SDK_ROOT}/components/libraries/hardfault/hardfault_implementation.c
+  ${NRF_SDK_ROOT}/components/libraries/log/src/nrf_log_frontend.c
+  ${NRF_SDK_ROOT}/components/libraries/log/src/nrf_log_str_formatter.c
   ${NRF_SDK_ROOT}/components/libraries/mem_manager/mem_manager.c
   ${NRF_SDK_ROOT}/components/libraries/memobj/nrf_memobj.c
   ${NRF_SDK_ROOT}/components/libraries/queue/nrf_queue.c
@@ -141,20 +142,13 @@ set(
   ${NRF_SDK_ROOT}/components/softdevice/common/nrf_sdh.c
   ${NRF_SDK_ROOT}/components/softdevice/common/nrf_sdh_ble.c
   ${NRF_SDK_ROOT}/components/softdevice/common/nrf_sdh_soc.c
-  ${NRF_SDK_ROOT}/components/libraries/log/src/nrf_log_backend_rtt.c
-  ${NRF_SDK_ROOT}/components/libraries/log/src/nrf_log_backend_serial.c
-  ${NRF_SDK_ROOT}/components/libraries/log/src/nrf_log_default_backends.c
-  ${NRF_SDK_ROOT}/components/libraries/log/src/nrf_log_frontend.c
-  ${NRF_SDK_ROOT}/components/libraries/log/src/nrf_log_str_formatter.c
-  ${NRF_SDK_ROOT}/external/segger_rtt/SEGGER_RTT.c
-  ${NRF_SDK_ROOT}/external/segger_rtt/SEGGER_RTT_Syscalls_GCC.c
-  ${NRF_SDK_ROOT}/external/segger_rtt/SEGGER_RTT_printf.c
   ${NRF_SDK_ROOT}/external/fprintf/nrf_fprintf.c
   ${NRF_SDK_ROOT}/external/fprintf/nrf_fprintf_format.c
   ${NRF_SDK_ROOT}/external/nano-pb/pb_common.c
   ${NRF_SDK_ROOT}/external/nano-pb/pb_decode.c
+  ${NRF_SDK_ROOT}/integration/nrfx/legacy/nrf_drv_uart.c
+  ${NRF_SDK_ROOT}/modules/nrfx/drivers/src/nrfx_uart.c
   ${NRF_SDK_ROOT}/modules/nrfx/drivers/src/nrfx_uarte.c
-  ${NRF_SDK_ROOT}/modules/nrfx/drivers/src/nrfx_twi.c
   ${NRF_SDK_ROOT}/modules/nrfx/drivers/src/prs/nrfx_prs.c
   ${NRF_SDK_ROOT}/modules/nrfx/hal/nrf_nvmc.c
   ${NRF_SDK_ROOT}/modules/nrfx/mdk/gcc_startup_nrf52.S
@@ -201,9 +195,9 @@ target_compile_options(
   -mfloat-abi=hard -mfpu=fpv4-sp-d16
   # keep every function in a separate section, this allows linker to discard unused ones
   -ffunction-sections -fdata-sections -fno-strict-aliasing -fno-builtin -fshort-enums
-  # heap and stack (why set them for a library?)
-  # -D__HEAP_SIZE=4096
-  # -D__STACK_SIZE=4096
+  # heap and stack
+  -D__HEAP_SIZE=4096
+  -D__STACK_SIZE=4096
 )
 
 target_link_options(
@@ -232,15 +226,12 @@ add_executable(
 target_sources(
   ${CMAKE_PROJECT_NAME} PRIVATE 
   ${NRF_SDK_SRC}
-  ../drivers/nrf_i2c.c
-  axp216_config.c
 )
 
 target_include_directories(
   ${CMAKE_PROJECT_NAME} PRIVATE
   ${PROJECT_SOURCE_DIR}
   ${NRF_SDK_INC}
-  ../drivers
 )
 
 target_compile_options(
@@ -271,7 +262,7 @@ target_compile_options(
   -DS132
   -DSOFTDEVICE_PRESENT
   # project flags
-  # -DBOARD_PCA10040
+  -DBOARD_PCA10040
   -DSVC_INTERFACE_CALL_AS_NORMAL_FUNCTION
   -DuECC_ENABLE_VLI_API=0
   -DuECC_OPTIMIZATION_LEVEL=3

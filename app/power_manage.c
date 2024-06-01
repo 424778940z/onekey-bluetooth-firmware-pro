@@ -28,17 +28,22 @@ static void pmu_if_irq(const uint64_t irq)
     if ( irq == 0 )
         return;
 
+    nrf_delay_ms(15); // wait regs update
+
     pmu_p->PullStatus();
 
     if ( 0 != (irq & (1 << PWR_IRQ_PWR_CONNECTED)) )
     {
+        NRF_LOG_INFO("irq PWR_IRQ_PWR_CONNECTED");
         bak_buff[0] = BLE_CMD_POWER_STA;
         bak_buff[1] = BLE_INSERT_POWER;
         bak_buff[2] = (pmu_p->PowerStatus->wiredCharge ? AXP_CHARGE_TYPE_USB : AXP_CHARGE_TYPE_WIRELESS);
         send_stm_data_p(bak_buff, 3);
+        NRF_LOG_INFO(pmu_p->PowerStatus->wiredCharge ? "AXP_CHARGE_TYPE_USB" : "AXP_CHARGE_TYPE_WIRELESS");
     }
     if ( 0 != (irq & (1 << PWR_IRQ_PWR_DISCONNECTED)) )
     {
+        NRF_LOG_INFO("irq PWR_IRQ_PWR_DISCONNECTED");
         bak_buff[0] = BLE_CMD_POWER_STA;
         bak_buff[1] = BLE_REMOVE_POWER;
         bak_buff[2] = 0;
@@ -46,19 +51,20 @@ static void pmu_if_irq(const uint64_t irq)
     }
     if ( 0 != (irq & (1 << PWR_IRQ_CHARGING)) )
     {
+        NRF_LOG_INFO("irq PWR_IRQ_CHARGING");
         bak_buff[0] = BLE_CMD_POWER_STA;
         bak_buff[1] = BLE_CHARGING_PWR;
         bak_buff[2] = (pmu_p->PowerStatus->wiredCharge ? AXP_CHARGE_TYPE_USB : AXP_CHARGE_TYPE_WIRELESS);
         send_stm_data_p(bak_buff, 3);
     }
-    if ( 0 != (irq & (1 << PWR_IRQ_CHARGED)) )
-    {
-
-        bak_buff[0] = BLE_CMD_POWER_STA;
-        bak_buff[1] = BLE_CHAGE_OVER;
-        bak_buff[2] = (pmu_p->PowerStatus->wiredCharge ? AXP_CHARGE_TYPE_USB : AXP_CHARGE_TYPE_WIRELESS);
-        send_stm_data_p(bak_buff, 3);
-    }
+    // if ( 0 != (irq & (1 << PWR_IRQ_CHARGED)) )
+    // {
+    //     NRF_LOG_INFO("irq PWR_IRQ_CHARGED");
+    //     bak_buff[0] = BLE_CMD_POWER_STA;
+    //     bak_buff[1] = BLE_CHAGE_OVER;
+    //     bak_buff[2] = (pmu_p->PowerStatus->wiredCharge ? AXP_CHARGE_TYPE_USB : AXP_CHARGE_TYPE_WIRELESS);
+    //     send_stm_data_p(bak_buff, 3);
+    // }
     if ( 0 != (irq & (1 << PWR_IRQ_BATT_LOW)) ) {}
     if ( 0 != (irq & (1 << PWR_IRQ_BATT_CRITICAL)) ) {}
     if ( 0 != (irq & (1 << PWR_IRQ_PB_PRESS)) )
