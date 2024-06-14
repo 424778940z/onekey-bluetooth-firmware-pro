@@ -135,67 +135,43 @@ static bool axp216_charge_current_sel(bool low_current_mode)
 
 Power_Error_t axp216_init(void)
 {
-    if ( initialized )
-    {
-        return PWR_ERROR_NONE;
-    }
-
-    do
+    if ( !initialized )
     {
         // interface init
-        if ( !*(pmu_interface_p->isInitialized) )
-        {
-            if ( !pmu_interface_p->Init() )
-            {
-                break;
-            }
-        }
+        if ( !pmu_interface_p->Init() )
+            return PWR_ERROR_FAIL;
 
         // get id
         uint8_t val = 0;
         if ( !axp216_reg_read(AXP216_IC_TYPE, &val) )
-        {
-            break;
-        }
+            return PWR_ERROR_FAIL;
 
         // compare id
         if ( val != 0x62 )
-            break;
+            return PWR_ERROR_FAIL;
 
         initialized = true;
-        return PWR_ERROR_NONE;
     }
-    while ( false );
 
-    return PWR_ERROR_FAIL;
+    return PWR_ERROR_NONE;
 }
 
 Power_Error_t axp216_deinit(void)
 {
-
     if ( !initialized )
-        return PWR_ERROR_NONE;
-
-    do
     {
-        // interface deinit()
-        if ( *(pmu_interface_p->isInitialized) )
-            if ( !pmu_interface_p->Deinit() )
-                break;
-
-        // nothing left
+        if ( !pmu_interface_p->Deinit() )
+            return PWR_ERROR_FAIL;
 
         initialized = false;
-        return PWR_ERROR_NONE;
     }
-    while ( false );
-
-    return PWR_ERROR_FAIL;
+    return PWR_ERROR_NONE;
 }
 
 Power_Error_t axp216_reset(void)
 {
     EC_E_BOOL_R_PWR_ERR(axp216_set_bits(AXP216_VOFF_SET, (1 << 6)));
+
     return PWR_ERROR_NONE;
 }
 
@@ -386,31 +362,30 @@ Power_Error_t axp216_pull_status(void)
          ((hlbuff.u8_low & ((1 << 5) | (1 << 4))) == ((1 << 5) | (1 << 4)))    // vbus
         );
 
-    if ( status_temp.chargeAllowed && status_temp.chargerAvailable )
+    if ( status_temp.chargerAvailable )
     {
-        if ( ((hlbuff.u8_low & (1 << 2)) == (1 << 2)) ) // check if charging
-        {
-            // read gpio
-            EC_E_BOOL_R_PWR_ERR(axp216_reg_write(AXP216_GPIO1_CTL, 0b00000010)); // gpio1 input
-            hlbuff.u8_high = 0;
-            EC_E_BOOL_R_PWR_ERR(axp216_reg_read(AXP216_GPIO01_SIGNAL, &(hlbuff.u8_low))); // gpio1 read
-            EC_E_BOOL_R_PWR_ERR(axp216_reg_write(AXP216_GPIO1_CTL, 0b00000111));          // gpio1 float
-            status_temp.wirelessCharge = ((hlbuff.u8_low & (1 << 1)) != (1 << 1));        // low when wireless charging
+        // read gpio
+        bool gpio_high_low = true;
+        EC_E_BOOL_R_PWR_ERR(axp216_reg_write(AXP216_GPIO1_CTL, 0b00000010)); // gpio1 input
+        hlbuff.u8_high = 0;
+        EC_E_BOOL_R_PWR_ERR(axp216_reg_read(AXP216_GPIO01_SIGNAL, &(hlbuff.u8_low))); // gpio1 read
+        EC_E_BOOL_R_PWR_ERR(axp216_reg_write(AXP216_GPIO1_CTL, 0b00000111));          // gpio1 float
+        gpio_high_low = ((hlbuff.u8_low & (1 << 1)) == (1 << 1));
 
-            // if not wireless charging then it's wired
-            status_temp.wiredCharge = !status_temp.wirelessCharge;
+        status_temp.wiredCharge = gpio_high_low;
+        status_temp.wirelessCharge = !gpio_high_low; // low is wireless
 
-            // wireless charge current limit to 300ma
-            EC_E_BOOL_R_PWR_ERR(axp216_charge_current_sel(status_temp.wirelessCharge));
-        }
-        else
-        {
-            status_temp.wiredCharge = false;
-            status_temp.wirelessCharge = false;
-        }
+        // wireless charge current limit to 300ma
+        EC_E_BOOL_R_PWR_ERR(axp216_charge_current_sel(status_temp.wirelessCharge));
 
-        if ( status_temp.wiredCharge || status_temp.wirelessCharge )
+        hlbuff.u8_high = 0;
+        EC_E_BOOL_R_PWR_ERR(axp216_reg_read(AXP216_MODE_CHGSTATUS, &(hlbuff.u8_low)));
+        status_temp.chargeFinished = ((hlbuff.u8_low & (1 << 6)) != (1 << 6));
+
+        // if charging allowd, check charging status
+        if ( status_temp.chargeAllowed && !status_temp.chargeFinished )
         {
+            // charging current
             EC_E_BOOL_R_PWR_ERR(axp216_reg_read(AXP216_CCBATH_RES, &(hlbuff.u8_high)));
             EC_E_BOOL_R_PWR_ERR(axp216_reg_read(AXP216_CCBATL_RES, &(hlbuff.u8_low)));
             status_temp.chargeCurrent = (hlbuff.u16 >> 4);
@@ -418,15 +393,12 @@ Power_Error_t axp216_pull_status(void)
         }
         else
         {
+            // discharging current
             EC_E_BOOL_R_PWR_ERR(axp216_reg_read(AXP216_DCBATH_RES, &(hlbuff.u8_high)));
             EC_E_BOOL_R_PWR_ERR(axp216_reg_read(AXP216_DCBATL_RES, &(hlbuff.u8_low)));
             status_temp.dischargeCurrent = (hlbuff.u16 >> 4);
             status_temp.chargeCurrent = 0;
         }
-
-        hlbuff.u8_high = 0;
-        EC_E_BOOL_R_PWR_ERR(axp216_reg_read(AXP216_MODE_CHGSTATUS, &(hlbuff.u8_low)));
-        status_temp.chargeFinished = ((hlbuff.u8_low & (1 << 6)) != (1 << 6));
     }
     else
     {

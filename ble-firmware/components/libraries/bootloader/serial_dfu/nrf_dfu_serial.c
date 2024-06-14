@@ -150,6 +150,8 @@ void dfu_req_handler_rsp_clbk(nrf_dfu_response_t * p_res, void * p_context)
     if (p_res->result != NRF_DFU_RES_CODE_SUCCESS)
     {
         NRF_LOG_WARNING("DFU request completed with result: 0x%x", p_res->result);
+        if(p_res->result == NRF_DFU_RES_CODE_EXT_ERROR)
+            NRF_LOG_WARNING("EXT ERROR: 0x%x", ext_error_get());
     }
 
     switch (p_res->request)

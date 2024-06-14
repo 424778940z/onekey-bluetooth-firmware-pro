@@ -4230,7 +4230,7 @@
 
 
 #ifndef NRFX_WDT_CONFIG_RELOAD_VALUE
-#define NRFX_WDT_CONFIG_RELOAD_VALUE 2000
+#define NRFX_WDT_CONFIG_RELOAD_VALUE 5000
 #endif
 
 // <o> NRFX_WDT_CONFIG_NO_IRQ  - Remove WDT IRQ handling from WDT driver
@@ -4260,7 +4260,7 @@
 // <e> NRFX_WDT_CONFIG_LOG_ENABLED - Enables logging in the module.
 //==========================================================
 #ifndef NRFX_WDT_CONFIG_LOG_ENABLED
-#define NRFX_WDT_CONFIG_LOG_ENABLED 1
+#define NRFX_WDT_CONFIG_LOG_ENABLED 0
 #endif
 // <o> NRFX_WDT_CONFIG_LOG_LEVEL  - Default Severity level
  
@@ -4271,7 +4271,7 @@
 // <4=> Debug 
 
 #ifndef NRFX_WDT_CONFIG_LOG_LEVEL
-#define NRFX_WDT_CONFIG_LOG_LEVEL 4
+#define NRFX_WDT_CONFIG_LOG_LEVEL 3
 #endif
 
 // <o> NRFX_WDT_CONFIG_INFO_COLOR  - ANSI escape code prefix.

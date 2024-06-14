@@ -89,7 +89,6 @@ set(
   ${NRF_SDK_ROOT}/components/libraries/bootloader/dfu/nrf_dfu_mbr.c
   ${NRF_SDK_ROOT}/components/libraries/bootloader/dfu/nrf_dfu_req_handler.c
   ${NRF_SDK_ROOT}/components/libraries/bootloader/dfu/nrf_dfu_settings.c
-  # ${NRF_SDK_ROOT}/components/libraries/bootloader/dfu/nrf_dfu_settings_svci.c
   ${NRF_SDK_ROOT}/components/libraries/bootloader/dfu/nrf_dfu_svci.c
   ${NRF_SDK_ROOT}/components/libraries/bootloader/dfu/nrf_dfu_svci_handler.c
   ${NRF_SDK_ROOT}/components/libraries/bootloader/dfu/nrf_dfu_transport.c
@@ -153,7 +152,6 @@ set(
   ${NRF_SDK_ROOT}/external/fprintf/nrf_fprintf_format.c
   ${NRF_SDK_ROOT}/external/nano-pb/pb_common.c
   ${NRF_SDK_ROOT}/external/nano-pb/pb_decode.c
-  ${NRF_SDK_ROOT}/integration/nrfx/legacy/nrf_drv_uart.c
   ${NRF_SDK_ROOT}/modules/nrfx/drivers/src/nrfx_uarte.c
   ${NRF_SDK_ROOT}/modules/nrfx/drivers/src/nrfx_twi.c
   ${NRF_SDK_ROOT}/modules/nrfx/drivers/src/prs/nrfx_prs.c
@@ -202,9 +200,9 @@ target_compile_options(
   -mfloat-abi=hard -mfpu=fpv4-sp-d16
   # keep every function in a separate section, this allows linker to discard unused ones
   -ffunction-sections -fdata-sections -fno-strict-aliasing -fno-builtin -fshort-enums
-  # heap and stack (why set them for a library?)
-  # -D__HEAP_SIZE=4096
-  # -D__STACK_SIZE=4096
+  # heap and stack
+  -D__HEAP_SIZE=4096
+  -D__STACK_SIZE=4096
 )
 
 target_link_options(
@@ -259,6 +257,7 @@ target_compile_options(
   # Uncomment the line below to enable link time optimization
   # -flto=auto
   # C flags common to all targets
+  # -DBLE_STACK_SUPPORT_REQD
   -DCONFIG_GPIO_AS_PINRESET
   -DFLOAT_ABI_HARD
   -DMBR_PRESENT
