@@ -4,6 +4,7 @@
 
 #include "nrf_delay.h"
 #include "nrf_log.h"
+#include "nrf_log_ctrl.h"
 #include "nrf_fstorage.h"
 #include "nrf_fstorage_sd.h"
 
@@ -37,7 +38,7 @@ static void flash_evt_handler(nrf_fstorage_evt_t* p_evt)
 
 static NRF_FSTORAGE_DEF(nrf_fstorage_t fstorage_config) = {
     .evt_handler = flash_evt_handler,
-    .start_addr = 0x6D000,
+    .start_addr = 0x6A000,
     .end_addr = 0x6E000,
 };
 
