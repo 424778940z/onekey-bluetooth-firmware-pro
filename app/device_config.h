@@ -18,8 +18,9 @@ typedef struct
 } deviceCfg_keystore_t;
 uint32_t deviceCfg_keystore_crc32(deviceCfg_keystore_t* keystore);
 bool deviceCfg_keystore_validate(deviceCfg_keystore_t* keystore);
-bool deviceCfg_keystore_restore_from_uicr(deviceCfg_keystore_t* key_store);
-bool deviceCfg_keystore_backup_to_uicr(deviceCfg_keystore_t* key_store);
+bool deviceCfg_keystore_restore_from_uicr(deviceCfg_keystore_t* keystore);
+bool deviceCfg_keystore_backup_to_uicr(deviceCfg_keystore_t* keystore);
+bool deviceCfg_keystore_backup_compare(deviceCfg_keystore_t* keystore);
 bool deviceCfg_keystore_setup_new(deviceCfg_keystore_t* keystore);
 bool deviceCfg_keystore_lock(deviceCfg_keystore_t* keystore);
 
