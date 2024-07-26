@@ -405,9 +405,6 @@ static ble_uuid_t m_adv_uuids[] =                        /**< Universally unique
         {BLE_UUID_BATTERY_SERVICE, BLE_UUID_TYPE_BLE},
         {BLE_UUID_NUS_SERVICE, BLE_UUID_TYPE_BLE}};
 
-#ifdef SCHED_ENABLE
-static void twi_write_data(void* p_event_data, uint16_t event_size);
-#endif
 void forwarding_to_st_data(void);
 
 static volatile uint8_t flag_uart_trans = 1;
@@ -438,84 +435,11 @@ static volatile bool pmu_feat_charge_enable = false;
 static volatile bool led_brightness_synced = false;
 static volatile uint8_t led_brightness_value = 0;
 
-#ifdef SCHED_ENABLE
-static ringbuffer_t m_ble_fifo;
-
-static void create_ringBuffer(ringbuffer_t* ringBuf, uint8_t* buf, uint32_t buf_len)
-{
-    ringBuf->br = 0;
-    ringBuf->bw = 0;
-    ringBuf->btoRead = 0;
-    ringBuf->source = buf;
-    ringBuf->length = buf_len;
-}
-
-static void clear_ringBuffer(ringbuffer_t* ringBuf)
-{
-    ringBuf->br = 0;
-    ringBuf->bw = 0;
-    ringBuf->btoRead = 0;
-    memset((uint8_t*)ringBuf->source, 0, ringBuf->length);
-}
-
-static uint32_t write_ringBuffer(uint8_t* buffer, uint32_t size, ringbuffer_t* ringBuf)
-{
-    uint32_t len = 0;
-    uint32_t ringBuf_bw = ringBuf->bw;
-    uint32_t ringBuf_len = ringBuf->length;
-    uint8_t* ringBuf_source = ringBuf->source;
-
-    if ( (ringBuf_bw + size) <= ringBuf_len )
-    {
-        memcpy(ringBuf_source + ringBuf_bw, buffer, size);
-    }
-    else
-    {
-        len = ringBuf_len - ringBuf_bw;
-        memcpy(ringBuf_source + ringBuf_bw, buffer, len);
-        memcpy(ringBuf_source, buffer + ringBuf_bw, size - len);
-    }
-
-    ringBuf->bw = (ringBuf->bw + size) % ringBuf_len;
-    ringBuf->btoRead += size;
-
-    return size;
-}
-
-static uint32_t read_ringBuffer(uint8_t* buffer, uint32_t size, ringbuffer_t* ringBuf)
-{
-    uint32_t len = 0;
-    uint32_t ringBuf_br = ringBuf->br;
-    uint32_t ringBuf_len = ringBuf->length;
-    uint8_t* ringBuf_source = ringBuf->source;
-
-    if ( (ringBuf_br + size) <= ringBuf_len )
-    {
-        memcpy(buffer, ringBuf_source + ringBuf_br, size);
-    }
-    else
-    {
-        len = ringBuf_len - ringBuf_br;
-        memcpy(buffer, ringBuf_source + ringBuf_br, len);
-        memcpy(buffer + len, ringBuf_source, size - len);
-    }
-
-    ringBuf->br = (ringBuf->br + size) % ringBuf_len;
-    ringBuf->btoRead -= size;
-
-    return size;
-}
-
-static uint32_t get_ringBuffer_btoRead(ringbuffer_t* ringBuf)
-{
-    return ringBuf->btoRead;
-}
-
-static uint32_t get_ringBuffer_length(ringbuffer_t* ringBuf)
-{
-    return ringBuf->length;
-}
-#endif
+// misc status flags
+// mainly use for workarounds when needs shutdown before app fullly boots to main even loop
+// NRF5 SDK is poorly designed which do not track if a feature is initialized when calling apis
+// Thus uninit function may stuck if feature init never called
+static volatile bool app_uart_is_initialized = false;
 
 /**@brief Handler for shutdown preparation.
  *
@@ -530,23 +454,29 @@ static uint32_t get_ringBuffer_length(ringbuffer_t* ringBuf)
 static bool app_shutdown_handler(nrf_pwr_mgmt_evt_t event)
 {
     NRF_LOG_DEBUG("%s , nrf_pwr_mgmt_evt_t = %d", __func__, event);
+    NRF_LOG_FLUSH();
 
     switch ( event )
     {
     case NRF_PWR_MGMT_EVT_PREPARE_WAKEUP:
         // stop bt adv
-        if ( !bt_advertising_ctrl(false, false) )
-            return false;
+        if ( nrf_sdh_is_enabled() )
+        {
+            if ( !bt_advertising_ctrl(false, false) )
+                return false;
+        }
         // enable wakeup
         nrf_gpio_cfg_sense_input(PMIC_PWROK_IO, NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_SENSE_HIGH);
-        nrf_gpio_cfg_sense_input(PMIC_IRQ_IO, NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_SENSE_HIGH);
+        // nrf_gpio_cfg_sense_input(PMIC_IRQ_IO, NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_SENSE_HIGH);
+        return true;
+
+    case NRF_PWR_MGMT_EVT_PREPARE_RESET:
         return true;
 
     case NRF_PWR_MGMT_EVT_PREPARE_DFU:
     case NRF_PWR_MGMT_EVT_PREPARE_SYSOFF:
-    case NRF_PWR_MGMT_EVT_PREPARE_RESET:
     default:
-        return true;
+        return false;
     }
 }
 NRF_PWR_MGMT_HANDLER_REGISTER(app_shutdown_handler, 0);
@@ -595,7 +525,11 @@ static void enter_low_power_mode(void)
         pmu_p->Deinit();
     gpio_uninit();
     nrf_gpio_cfg_default(ST_WAKE_IO);
-    app_uart_close();
+    if ( app_uart_is_initialized )
+    {
+        app_uart_close();
+        app_uart_is_initialized = false;
+    }
     nrf_pwr_mgmt_shutdown(NRF_PWR_MGMT_SHUTDOWN_GOTO_SYSOFF);
 }
 
@@ -745,7 +679,17 @@ static void pm_evt_handler(const pm_evt_t* p_evt)
 
     switch ( p_evt->evt_id )
     {
+
+    case PM_EVT_CONN_SEC_CONFIG_REQ:
+        NRF_LOG_INFO("%s ---> PM_EVT_CONN_SEC_CONFIG_REQ", __func__);
+        {
+            pm_conn_sec_config_t conn_sec_config = {.allow_repairing = true};
+            pm_conn_sec_config_reply(p_evt->conn_handle, &conn_sec_config);
+        }
+        break;
+
     case PM_EVT_CONN_SEC_SUCCEEDED:
+        NRF_LOG_INFO("%s ---> PM_EVT_CONN_SEC_SUCCEEDED", __func__);
         {
             pm_conn_sec_status_t conn_sec_status;
 
@@ -781,24 +725,44 @@ static void pm_evt_handler(const pm_evt_t* p_evt)
         }
         break;
 
-    case PM_EVT_CONN_SEC_CONFIG_REQ:
-        {
-            pm_conn_sec_config_t conn_sec_config = {.allow_repairing = true};
-            pm_conn_sec_config_reply(p_evt->conn_handle, &conn_sec_config);
-        }
-        break; // PM_EVT_CONN_SEC_CONFIG_REQ
-
     case PM_EVT_CONN_SEC_FAILED:
+        NRF_LOG_INFO("%s ---> PM_EVT_CONN_SEC_FAILED", __func__);
+        NRF_LOG_INFO(
+            "conn_sec_failed: procedure=0x%x, error=0x%x, error_src=0x%x", p_evt->params.conn_sec_failed.procedure,
+            p_evt->params.conn_sec_failed.error, p_evt->params.conn_sec_failed.error_src
+        );
         m_conn_handle = BLE_CONN_HANDLE_INVALID;
 
         bak_buff[0] = BLE_CMD_PAIR_STA;
         bak_buff[1] = BLE_PAIR_FAIL;
         send_stm_data(bak_buff, 2);
-
         break;
 
+    case PM_EVT_LOCAL_DB_CACHE_APPLIED:
+        NRF_LOG_INFO("%s ---> PM_EVT_LOCAL_DB_CACHE_APPLIED", __func__);
+        break;
+    case PM_EVT_LOCAL_DB_CACHE_APPLY_FAILED:
+        NRF_LOG_INFO("%s ---> PM_EVT_LOCAL_DB_CACHE_APPLY_FAILED", __func__);
+        break;
+
+    case PM_EVT_PEER_DATA_UPDATE_SUCCEEDED:
+        NRF_LOG_INFO("%s ---> PM_EVT_PEER_DATA_UPDATE_SUCCEEDED", __func__);
+        break;
+    case PM_EVT_PEER_DATA_UPDATE_FAILED:
+        NRF_LOG_INFO("%s ---> PM_EVT_PEER_DATA_UPDATE_FAILED", __func__);
+        break;
+    case PM_EVT_PEER_DELETE_SUCCEEDED:
+        NRF_LOG_INFO("%s ---> PM_EVT_PEER_DELETE_SUCCEEDED", __func__);
+        break;
+    case PM_EVT_PEER_DELETE_FAILED:
+        NRF_LOG_INFO("%s ---> PM_EVT_PEER_DELETE_FAILED", __func__);
+        break;
     case PM_EVT_PEERS_DELETE_SUCCEEDED:
+        NRF_LOG_INFO("%s ---> PM_EVT_PEERS_DELETE_SUCCEEDED", __func__);
         bt_advertising_ctrl(true, false);
+        break;
+    case PM_EVT_PEERS_DELETE_FAILED:
+        NRF_LOG_INFO("%s ---> PM_EVT_PEERS_DELETE_FAILED", __func__);
         break;
 
     default:
@@ -854,12 +818,7 @@ static void gap_params_init(void)
     ret_code_t err_code;
     ble_gap_conn_params_t gap_conn_params;
     ble_gap_conn_sec_mode_t sec_mode;
-#ifdef FIXED_PIN
-    // set fixed Passkey
-    ble_opt_t ble_opt;
-    uint8_t g_ucBleTK[6] = "123456";
-    ble_opt.gap_opt.passkey.p_passkey = g_ucBleTK;
-#endif
+
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&sec_mode);
 
     err_code = sd_ble_gap_device_name_set(&sec_mode, (const uint8_t*)ble_adv_name, sizeof(ble_adv_name));
@@ -874,11 +833,6 @@ static void gap_params_init(void)
 
     err_code = sd_ble_gap_ppcp_set(&gap_conn_params);
     APP_ERROR_CHECK(err_code);
-#ifdef FIXED_PIN
-    // set fixed Passkey
-    err_code = sd_ble_opt_set(BLE_GAP_OPT_PASSKEY, &ble_opt);
-    APP_ERROR_CHECK(err_code);
-#endif
 }
 
 static uint16_t m_ble_nus_max_data_len =
@@ -924,85 +878,6 @@ static void nrf_qwr_error_handler(uint32_t nrf_error)
     APP_ERROR_HANDLER(nrf_error);
 }
 
-#ifdef BUTTONLESS_ENABLED
-static void advertising_config_get(ble_adv_modes_config_t* p_config)
-{
-    memset(p_config, 0, sizeof(ble_adv_modes_config_t));
-
-    p_config->ble_adv_fast_enabled = true;
-    p_config->ble_adv_fast_interval = APP_ADV_INTERVAL;
-    p_config->ble_adv_fast_timeout = APP_ADV_DURATION;
-}
-
-// YOUR_JOB: Update this code if you want to do anything given a DFU event (optional).
-/**@brief Function for handling dfu events from the Buttonless Secure DFU service
- *
- * @param[in]   event   Event from the Buttonless Secure DFU service.
- */
-static void ble_dfu_evt_handler(ble_dfu_buttonless_evt_type_t event)
-{
-    bak_buff[0] = UART_CMD_DFU_STA;
-    bak_buff[1] = 0x01;
-
-    switch ( event )
-    {
-    case BLE_DFU_EVT_BOOTLOADER_ENTER_PREPARE:
-        {
-            NRF_LOG_INFO("Device is preparing to enter bootloader mode.");
-
-            bak_buff[2] = VALUE_PREPARE_DFU;
-
-            // Prevent device from advertising on disconnect.
-            ble_adv_modes_config_t config;
-            advertising_config_get(&config);
-            config.ble_adv_on_disconnect_disabled = true;
-            ble_advertising_modes_config_set(&m_advertising, &config);
-
-            // Disconnect all other bonded devices that currently are connected.
-            // This is required to receive a service changed indication
-            // on bootup after a successful (or aborted) Device Firmware Update.
-            uint32_t conn_count = ble_conn_state_for_each_connected(disconnect, NULL);
-            NRF_LOG_INFO("Disconnected %d links.", conn_count);
-            break;
-        }
-
-    case BLE_DFU_EVT_BOOTLOADER_ENTER:
-
-        bak_buff[2] = VALUE_ENTER_DFU;
-
-        // YOUR_JOB: Write app-specific unwritten data to FLASH, control finalization of this
-        //           by delaying reset by reporting false in app_shutdown_handler
-        NRF_LOG_INFO("Device will enter bootloader mode.");
-        break;
-
-    case BLE_DFU_EVT_BOOTLOADER_ENTER_FAILED:
-
-        bak_buff[2] = VALUE_ENTER_FAILED;
-
-        NRF_LOG_ERROR("Request to enter bootloader mode failed asynchroneously.");
-        // YOUR_JOB: Take corrective measures to resolve the issue
-        //           like calling APP_ERROR_CHECK to reset the device.
-        break;
-
-    case BLE_DFU_EVT_RESPONSE_SEND_ERROR:
-
-        bak_buff[2] = VALUE_RSP_FAILED;
-
-        NRF_LOG_ERROR("Request to send a response to client failed.");
-        // YOUR_JOB: Take corrective measures to resolve the issue
-        //           like calling APP_ERROR_CHECK to reset the device.
-        APP_ERROR_CHECK(false);
-        break;
-
-    default:
-
-        bak_buff[2] = VALUE_UNKNOWN_ERR;
-
-        NRF_LOG_ERROR("Unknown event from ble_dfu_buttonless.");
-        break;
-    }
-}
-#endif
 /**@brief Function for handling the data from the Nordic UART Service.
  *
  * @details This function will process the data received from the Nordic UART BLE Service and send
@@ -1012,59 +887,8 @@ static void ble_dfu_evt_handler(ble_dfu_buttonless_evt_type_t event)
  */
 /**@snippet [Handling the data received over BLE] */
 static void nus_data_handler(ble_nus_evt_t* p_evt)
-#ifdef SCHED_ENABLE
 {
-    static uint32_t msg_len;
-    static bool reading = false;
-    uint8_t* rcv_data = (uint8_t*)p_evt->params.rx_data.p_data;
-    uint32_t rcv_len = p_evt->params.rx_data.length;
-
-    if ( p_evt->type == BLE_NUS_EVT_RX_DATA )
-    {
-        NRF_LOG_INFO("Received data from BLE NUS.");
-        NRF_LOG_HEXDUMP_DEBUG(p_evt->params.rx_data.p_data, p_evt->params.rx_data.length);
-
-        if ( reading == false )
-        {
-            if ( rcv_data[0] == '?' && rcv_data[1] == '#' && rcv_data[2] == '#' )
-            {
-                data_recived_flag = false;
-                if ( rcv_len < 9 )
-                {
-                    return;
-                }
-                else
-                {
-                    msg_len =
-                        (uint32_t)((rcv_data[5] << 24) + (rcv_data[6] << 16) + (rcv_data[7] << 8) + (rcv_data[8]));
-                    clear_ringBuffer(&m_ble_fifo);
-                    write_ringBuffer(rcv_data, rcv_len, &m_ble_fifo);
-                    if ( msg_len > rcv_len )
-                    {
-                        reading = true;
-                    }
-                    ble_evt_flag = BLE_RCV_DATA;
-                }
-            }
-        }
-        else
-        {
-            if ( rcv_len < msg_len )
-            {
-                reading = true;
-                msg_len -= rcv_len;
-                write_ringBuffer(rcv_data, rcv_len, &m_ble_fifo);
-            }
-            else
-            {
-                reading = false;
-            }
-            ble_evt_flag = BLE_RCV_DATA;
-        }
-    }
-}
-#else
-{
+    NRF_LOG_INFO("----> nus_data_handler CALLED");
     static uint32_t msg_len;
     uint32_t pad;
     // uint8_t *rcv_data=(uint8_t *)p_evt->params.rx_data.p_data;
@@ -1072,8 +896,8 @@ static void nus_data_handler(ble_nus_evt_t* p_evt)
 
     if ( p_evt->type == BLE_NUS_EVT_RX_DATA )
     {
-        // NRF_LOG_INFO("Received data from BLE NUS.");
-        // NRF_LOG_HEXDUMP_DEBUG(p_evt->params.rx_data.p_data, p_evt->params.rx_data.length);
+        NRF_LOG_INFO("Received data from BLE NUS.");
+        NRF_LOG_HEXDUMP_DEBUG(p_evt->params.rx_data.p_data, p_evt->params.rx_data.length);
         data_recived_len = p_evt->params.rx_data.length;
         memcpy(data_recived_buf, (uint8_t*)p_evt->params.rx_data.p_data, data_recived_len);
 
@@ -1141,7 +965,6 @@ static void nus_data_handler(ble_nus_evt_t* p_evt)
         forwarding_to_st_data();
     }
 }
-#endif
 
 /**@brief Function for initializing services that will be used by the application.
  *
@@ -1150,24 +973,16 @@ static void nus_data_handler(ble_nus_evt_t* p_evt)
 static void services_init(void)
 {
     ret_code_t err_code;
+    nrf_ble_qwr_init_t qwr_init = {0};
     ble_dis_init_t dis_init;
     ble_nus_init_t nus_init;
-    nrf_ble_qwr_init_t qwr_init = {0};
-#ifdef BUTTONLESS_ENABLED
-    ble_dfu_buttonless_init_t dfus_init = {0};
-#endif
 
     // Initialize Queued Write Module.
     qwr_init.error_handler = nrf_qwr_error_handler;
 
     err_code = nrf_ble_qwr_init(&m_qwr, &qwr_init);
     APP_ERROR_CHECK(err_code);
-#ifdef BUTTONLESS_ENABLED
-    dfus_init.evt_handler = ble_dfu_evt_handler;
 
-    err_code = ble_dfu_buttonless_init(&dfus_init);
-    APP_ERROR_CHECK(err_code);
-#endif
     // Initialize Battery Service.
     sys_bas_init();
 
@@ -1191,11 +1006,10 @@ static void services_init(void)
     err_code = ble_dis_init(&dis_init);
     APP_ERROR_CHECK(err_code);
 #endif
+
     // Initialize NUS.
     memset(&nus_init, 0, sizeof(nus_init));
-
     nus_init.data_handler = nus_data_handler;
-
     err_code = ble_nus_init(&m_nus, &nus_init);
     APP_ERROR_CHECK(err_code);
 }
@@ -1327,9 +1141,30 @@ static void ble_evt_handler(const ble_evt_t* p_ble_evt, void* p_context)
 
     switch ( p_ble_evt->header.evt_id )
     {
-    case BLE_GAP_EVT_DISCONNECTED:
+
+        // GAP
+
+    case BLE_GAP_EVT_CONNECTED:
+        NRF_LOG_DEBUG("%s ---> BLE_GAP_EVT_CONNECTED", __func__);
         {
-            NRF_LOG_INFO("Disconnected");
+            ble_evt_flag = BLE_CONNECT;
+
+            bak_buff[0] = BLE_CMD_CON_STA;
+            bak_buff[1] = BLE_CON_STATUS;
+            send_stm_data(bak_buff, 2);
+
+            m_peer_to_be_deleted = PM_PEER_ID_INVALID;
+            m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
+            err_code = nrf_ble_qwr_conn_handle_assign(&m_qwr, m_conn_handle);
+            APP_ERROR_CHECK(err_code);
+            nrf_ble_gatt_data_length_set(&m_gatt, m_conn_handle, BLE_GAP_DATA_LENGTH_DEFAULT);
+            // Start Security Request timer.
+        }
+        break;
+
+    case BLE_GAP_EVT_DISCONNECTED:
+        NRF_LOG_DEBUG("%s ---> BLE_GAP_EVT_DISCONNECTED", __func__);
+        {
             ble_evt_flag = BLE_DISCONNECT;
             bond_check_key_flag = INIT_VALUE;
             m_conn_handle = BLE_CONN_HANDLE_INVALID;
@@ -1349,57 +1184,16 @@ static void ble_evt_handler(const ble_evt_t* p_ble_evt, void* p_context)
         }
         break;
 
-    case BLE_GAP_EVT_CONNECTED:
-        {
-            NRF_LOG_INFO("Connected");
-            ble_evt_flag = BLE_CONNECT;
-
-            bak_buff[0] = BLE_CMD_CON_STA;
-            bak_buff[1] = BLE_CON_STATUS;
-            send_stm_data(bak_buff, 2);
-
-            m_peer_to_be_deleted = PM_PEER_ID_INVALID;
-            m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
-            err_code = nrf_ble_qwr_conn_handle_assign(&m_qwr, m_conn_handle);
-            APP_ERROR_CHECK(err_code);
-            nrf_ble_gatt_data_length_set(&m_gatt, m_conn_handle, BLE_GAP_DATA_LENGTH_DEFAULT);
-            // Start Security Request timer.
-        }
-        break;
-
-    case BLE_GAP_EVT_PHY_UPDATE_REQUEST:
-        {
-            NRF_LOG_DEBUG("PHY update request.");
-            const ble_gap_phys_t phys = {
-                .rx_phys = BLE_GAP_PHY_AUTO,
-                .tx_phys = BLE_GAP_PHY_AUTO,
-            };
-            err_code = sd_ble_gap_phy_update(p_ble_evt->evt.gap_evt.conn_handle, &phys);
-            APP_ERROR_CHECK(err_code);
-        }
-        break;
-
-    case BLE_GATTC_EVT_TIMEOUT:
-        // Disconnect on GATT Client timeout event.
-        NRF_LOG_DEBUG("GATT Client Timeout.");
-        err_code =
-            sd_ble_gap_disconnect(p_ble_evt->evt.gattc_evt.conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
-        APP_ERROR_CHECK(err_code);
-        break;
-
-    case BLE_GATTS_EVT_TIMEOUT:
-        // Disconnect on GATT Server timeout event.
-        NRF_LOG_DEBUG("GATT Server Timeout.");
-        err_code =
-            sd_ble_gap_disconnect(p_ble_evt->evt.gatts_evt.conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
-        APP_ERROR_CHECK(err_code);
-        break;
+        // BLE_GAP_EVT_CONN_PARAM_UPDATE
 
     case BLE_GAP_EVT_SEC_PARAMS_REQUEST:
-        NRF_LOG_DEBUG("BLE_GAP_EVT_SEC_PARAMS_REQUEST");
+        NRF_LOG_DEBUG("%s ---> BLE_GAP_EVT_SEC_PARAMS_REQUEST", __func__);
         break;
 
+        // BLE_GAP_EVT_SEC_INFO_REQUEST
+
     case BLE_GAP_EVT_PASSKEY_DISPLAY:
+        NRF_LOG_DEBUG("%s ---> BLE_GAP_EVT_PASSKEY_DISPLAY", __func__);
         {
             char passkey[PASSKEY_LENGTH + 1];
             memcpy(passkey, p_ble_evt->evt.gap_evt.params.passkey_display.passkey, PASSKEY_LENGTH);
@@ -1414,15 +1208,18 @@ static void ble_evt_handler(const ble_evt_t* p_ble_evt, void* p_context)
         }
         break;
 
+        // BLE_GAP_EVT_KEY_PRESSED
+
     case BLE_GAP_EVT_AUTH_KEY_REQUEST:
-        NRF_LOG_INFO("BLE_GAP_EVT_AUTH_KEY_REQUEST");
+        NRF_LOG_DEBUG("%s ---> BLE_GAP_EVT_AUTH_KEY_REQUEST", __func__);
         break;
 
     case BLE_GAP_EVT_LESC_DHKEY_REQUEST:
-        NRF_LOG_INFO("BLE_GAP_EVT_LESC_DHKEY_REQUEST");
+        NRF_LOG_DEBUG("%s ---> BLE_GAP_EVT_LESC_DHKEY_REQUEST", __func__);
         break;
 
     case BLE_GAP_EVT_AUTH_STATUS:
+        NRF_LOG_DEBUG("%s ---> BLE_GAP_EVT_AUTH_STATUS", __func__);
         NRF_LOG_INFO(
             "BLE_GAP_EVT_AUTH_STATUS: status=0x%x bond=0x%x lv4: %d kdist_own:0x%x kdist_peer:0x%x",
             p_ble_evt->evt.gap_evt.params.auth_status.auth_status, p_ble_evt->evt.gap_evt.params.auth_status.bonded,
@@ -1432,6 +1229,70 @@ static void ble_evt_handler(const ble_evt_t* p_ble_evt, void* p_context)
         );
         bond_check_key_flag = AUTH_VALUE;
         break;
+
+        // case BLE_GAP_EVT_CONN_SEC_UPDATE:
+        //     NRF_LOG_DEBUG("%s ---> BLE_GAP_EVT_CONN_SEC_UPDATE", __func__);
+        //     break;
+
+        // case BLE_GAP_EVT_TIMEOUT:
+        //     NRF_LOG_DEBUG("%s ---> BLE_GAP_EVT_TIMEOUT", __func__);
+        //     err_code =
+        //         sd_ble_gap_disconnect(p_ble_evt->evt.gattc_evt.conn_handle,
+        //         BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
+        //     APP_ERROR_CHECK(err_code);
+        //     break;
+
+        // BLE_GAP_EVT_RSSI_CHANGED
+        // BLE_GAP_EVT_ADV_REPORT
+        // BLE_GAP_EVT_SEC_REQUEST
+        // BLE_GAP_EVT_CONN_PARAM_UPDATE_REQUEST
+        // BLE_GAP_EVT_SCAN_REQ_REPORT
+
+    case BLE_GAP_EVT_PHY_UPDATE_REQUEST:
+        NRF_LOG_DEBUG("%s ---> BLE_GAP_EVT_PHY_UPDATE_REQUEST", __func__);
+        {
+            const ble_gap_phys_t phys = {
+                .rx_phys = BLE_GAP_PHY_AUTO,
+                .tx_phys = BLE_GAP_PHY_AUTO,
+            };
+            err_code = sd_ble_gap_phy_update(p_ble_evt->evt.gap_evt.conn_handle, &phys);
+            APP_ERROR_CHECK(err_code);
+        }
+        break;
+
+        // BLE_GAP_EVT_PHY_UPDATE
+        // BLE_GAP_EVT_DATA_LENGTH_UPDATE_REQUEST
+        // BLE_GAP_EVT_DATA_LENGTH_UPDATE
+        // BLE_GAP_EVT_QOS_CHANNEL_SURVEY_REPORT
+        // BLE_GAP_EVT_ADV_SET_TERMINATED
+
+        // GATTC
+
+    case BLE_GATTC_EVT_TIMEOUT:
+        NRF_LOG_DEBUG("%s ---> BLE_GATTC_EVT_TIMEOUT", __func__);
+        // Disconnect on GATT Client timeout event.
+        NRF_LOG_DEBUG("GATT Client Timeout.");
+        err_code =
+            sd_ble_gap_disconnect(p_ble_evt->evt.gattc_evt.conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
+        APP_ERROR_CHECK(err_code);
+        break;
+
+        // GATTS
+
+    case BLE_GATTS_EVT_TIMEOUT:
+        NRF_LOG_DEBUG("%s ---> BLE_GATTS_EVT_TIMEOUT", __func__);
+        // Disconnect on GATT Server timeout event.
+        NRF_LOG_DEBUG("GATT Server Timeout.");
+        err_code =
+            sd_ble_gap_disconnect(p_ble_evt->evt.gatts_evt.conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
+        APP_ERROR_CHECK(err_code);
+        break;
+
+        // case BLE_GATTS_EVT_SYS_ATTR_MISSING:
+        //     // No system attributes have been stored.
+        //     err_code = sd_ble_gatts_sys_attr_set(p_ble_evt->evt.gatts_evt.conn_handle, NULL, 0, 0);
+        //     APP_ERROR_CHECK(err_code);
+        //     break;
 
     default:
         // No implementation needed.
@@ -1795,6 +1656,7 @@ static void usr_uart_init(void)
         &comm_params, UART_RX_BUF_SIZE, UART_TX_BUF_SIZE, uart_event_handle, APP_IRQ_PRIORITY_LOWEST, err_code
     );
     APP_ERROR_CHECK(err_code);
+    app_uart_is_initialized = true;
 }
 
 /**@brief Function for initializing the Advertising functionality.
@@ -1856,9 +1718,7 @@ static void power_management_init(void)
     ret_code_t err_code = nrf_pwr_mgmt_init();
     APP_ERROR_CHECK(err_code);
 }
-#ifdef SCHED_ENABLE
 
-#else
 void forwarding_to_st_data(void)
 {
     uint8_t send_spi_offset = 0;
@@ -1890,7 +1750,7 @@ void forwarding_to_st_data(void)
         NRF_LOG_HEXDUMP_INST_INFO("recv data", data_recived_buf, data_recived_len);
     }
 }
-#endif
+
 static void ble_resp_data(void* p_event_data, uint16_t event_size)
 {
     ret_code_t err_code;
@@ -2008,13 +1868,6 @@ void in_gpiote_handler(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t action)
             phone_resp_data();
         }
         break;
-    case PMIC_PWROK_IO:
-        NRF_LOG_INFO("GPIO IRQ -> PMIC_PWROK_IO");
-        if ( action == NRF_GPIOTE_POLARITY_HITOLO )
-        {
-            enter_low_power_mode();
-        }
-        break;
     default:
         break;
     }
@@ -2028,19 +1881,13 @@ static void gpio_init(void)
     err_code = nrfx_gpiote_init();
     APP_ERROR_CHECK(err_code);
 
-    // nrfx_gpiote_in_config_t in_config = NRFX_GPIOTE_CONFIG_IN_SENSE_TOGGLE(false);
-    // in_config.pull = NRF_GPIO_PIN_PULLUP;
-
-    nrfx_gpiote_in_config_t in_config1 = NRFX_GPIOTE_CONFIG_IN_SENSE_HITOLO(true);
-    in_config1.pull = NRF_GPIO_PIN_PULLUP;
-    err_code = nrfx_gpiote_in_init(SLAVE_SPI_RSP_IO, &in_config1, in_gpiote_handler);
+    nrfx_gpiote_in_config_t in_config = NRFX_GPIOTE_CONFIG_IN_SENSE_HITOLO(true);
+    in_config.pull = NRF_GPIO_PIN_PULLUP;
+    err_code = nrfx_gpiote_in_init(SLAVE_SPI_RSP_IO, &in_config, in_gpiote_handler);
     APP_ERROR_CHECK(err_code);
     nrfx_gpiote_in_event_enable(SLAVE_SPI_RSP_IO, true);
 
-    err_code = nrfx_gpiote_in_init(PMIC_PWROK_IO, &in_config1, in_gpiote_handler);
-    APP_ERROR_CHECK(err_code);
-    nrfx_gpiote_in_event_enable(PMIC_PWROK_IO, true);
-
+    nrf_gpio_cfg_input(PMIC_PWROK_IO, NRF_GPIO_PIN_NOPULL);
     nrf_gpio_cfg_input(PMIC_IRQ_IO, NRF_GPIO_PIN_PULLUP);
 }
 
@@ -2211,7 +2058,7 @@ static void rsp_st_uart_cmd(void* p_event_data, uint16_t event_size)
         else
         {
             bak_buff[1] = BLE_KEY_RESP_SIGN;
-            if(deviceConfig_p->keystore.flag_locked != DEVICE_CONFIG_FLAG_MAGIC)
+            if ( deviceConfig_p->keystore.flag_locked != DEVICE_CONFIG_FLAG_MAGIC )
             {
                 // if keystore not locked, lock it now
                 deviceCfg_keystore_lock(&(deviceConfig_p->keystore));
@@ -2430,6 +2277,34 @@ static void pmu_status_refresh(void* p_event_data, uint16_t event_size)
     pmu_status_print();
 }
 
+static void pmu_pwrok_pull(void* p_event_data, uint16_t event_size)
+{
+    static uint8_t match_count = 0;
+    const uint8_t match_required = 10;
+
+    if ( !nrf_gpio_pin_read(PMIC_PWROK_IO) )
+    {
+        match_count++;
+        NRF_LOG_INFO("PowerOK debounce, match %u/%u", match_count, match_required);
+    }
+    else
+    {
+        if ( match_count > 0 )
+        {
+            match_count = 0;
+            NRF_LOG_INFO("PowerOK debounce, match reset");
+            NRF_LOG_FLUSH();
+        }
+    }
+
+    if ( (match_count >= match_required) )
+    {
+        NRF_LOG_INFO("PowerOK debounce, match fulfilled, entering low power mode");
+        NRF_LOG_FLUSH();
+        enter_low_power_mode();
+    }
+}
+
 static void pmu_irq_pull(void* p_event_data, uint16_t event_size)
 {
     if ( !nrf_gpio_pin_read(PMIC_IRQ_IO) )
@@ -2567,12 +2442,9 @@ int main(void)
     NRF_LOG_FLUSH();
     // ==> Bus Fault
     // SCB->SHCSR |= SCB_SHCSR_BUSFAULTENA_Msk;
-    // ==> Buttonless DFU
-#ifdef BUTTONLESS_ENABLED
-    // Initialize the async SVCI interface to bootloader before any interrupts are enabled.
-    ret_code_t err_code = ble_dfu_buttonless_async_svci_init();
-    APP_ERROR_CHECK(err_code);
-#endif
+    // ==> lowlevel minimal
+    gpio_init();
+    power_management_init();
     // ==> NRF Crypto API
     nrf_crypto_init();
     // ==> Power Manage IC, LED Driver, and Device Configs
@@ -2626,13 +2498,11 @@ int main(void)
     // General Init Items
     NRF_LOG_INFO("General Init Seq.");
     NRF_LOG_FLUSH();
-    gpio_init();
     usr_uart_init();
     usr_spim_init();
     timers_init();
-    watch_dog_init();
     scheduler_init();
-    power_management_init();
+    watch_dog_init();
 
     // ###############################
     // Power Manage Init Items
@@ -2649,9 +2519,6 @@ int main(void)
     NRF_LOG_FLUSH();
     ble_stack_init();
     mac_address_get();
-#ifdef SCHED_ENABLE
-    create_ringBuffer(&m_ble_fifo, data_recived_buf, sizeof(data_recived_buf));
-#endif
 #ifdef BOND_ENABLE
     peer_manager_init();
 #endif
@@ -2675,6 +2542,7 @@ int main(void)
     for ( ;; )
     {
         // event trigger
+        app_sched_event_put(NULL, 0, pmu_pwrok_pull);
         app_sched_event_put(NULL, 0, pmu_irq_pull);
         app_sched_event_put(NULL, 0, pmu_status_refresh);
         app_sched_event_put(NULL, 0, pmu_req_process);
