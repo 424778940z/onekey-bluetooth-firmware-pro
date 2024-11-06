@@ -278,6 +278,18 @@ ret_code_t gscm_local_db_cache_apply(uint16_t conn_handle)
     uint32_t             sys_attr_flags  = (SYS_ATTR_BOTH);
     bool                 all_attributes_applied = true;
 
+    NRF_LOG_INFO("peer info --> conn_handle=%lu peer_id=0x%lu", conn_handle, peer_id);
+    NRF_LOG_FLUSH();
+
+    uint8_t sys_attr_data_current[64];
+    uint16_t sys_attr_len_current = sizeof(sys_attr_data_current);
+    uint32_t sys_attr_flag_current = SYS_ATTR_BOTH;
+    err_code = sd_ble_gatts_sys_attr_get(conn_handle, sys_attr_data_current, &sys_attr_len_current, sys_attr_flag_current);
+    NRF_LOG_INFO("get attr --> %s", (err_code == NRF_SUCCESS)? "SUCCESS": "FAIL");
+    NRF_LOG_INFO("current attr --> sys_attr_len=%lu sys_attr_flags=0x%04x", sys_attr_len_current, sys_attr_flag_current);
+    NRF_LOG_HEXDUMP_INFO(sys_attr_data_current, sys_attr_len_current);
+    NRF_LOG_FLUSH();
+
     if (peer_id != PM_PEER_ID_INVALID)
     {
         err_code = pdb_peer_data_ptr_get(peer_id, PM_PEER_DATA_ID_GATT_LOCAL, &peer_data);
@@ -291,7 +303,12 @@ ret_code_t gscm_local_db_cache_apply(uint16_t conn_handle)
             sys_attr_flags  = p_local_gatt_db->flags;
         }
     }
-
+    NRF_LOG_INFO("target attr --> sys_attr_len=%lu sys_attr_flags=0x%04x", sys_attr_len, sys_attr_flags);
+    NRF_LOG_HEXDUMP_INFO(p_sys_attr_data, sys_attr_len);
+    err_code = sd_ble_gatts_sys_attr_set(conn_handle, p_sys_attr_data, sys_attr_len, sys_attr_flags);
+    NRF_LOG_INFO("set attr --> %s", (err_code == NRF_SUCCESS)? "SUCCESS": "FAIL");
+    NRF_LOG_FLUSH();
+    
     do
     {
         err_code = sd_ble_gatts_sys_attr_set(conn_handle, p_sys_attr_data, sys_attr_len, sys_attr_flags);
